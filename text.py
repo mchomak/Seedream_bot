@@ -224,6 +224,44 @@ phrases = {
         "btn_next": "Далее",
         "btn_confirm_next": "Далее",
         "btn_confirm_topup": "Пополнить баланс",
+        "upload_doc_only": "Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия).",
+        "upload_doc_wrong_type": "Это не похоже на изображение. Пожалуйста, отправьте фотографию одежды как документ (файл).",
+
+        "multi_items_not_supported": "Сейчас бот поддерживает генерацию только по одной вещи за раз. Сценарий для нескольких вещей скоро появится.",
+
+        "settings_intro_single": (
+            "Вы загрузили {count} вещь. Далее вы сможете выбрать фон, пол, возраст и цвет волос модели, "
+            "соотношение сторон и стиль фото на выходе."
+        ),
+
+        "background_select_single": (
+            "Выберите один или несколько цветов фона для создания фото ваших вещей на модели.\n"
+            "ВАЖНО: При выборе нескольких фонов генерируется соответствующее количество фотографий, "
+            "перемноженное на количество загруженных вещей."
+        ),
+        "background_selected_header": "Выбранные цвета фона:",
+        "background_need_one": "Выберите хотя бы один цвет фона, чтобы продолжить.",
+
+        "btn_bg_white": "Белый фон",
+        "btn_bg_beige": "Бежевый фон",
+        "btn_bg_pink": "Розовый фон",
+        "btn_bg_black": "Чёрный фон",
+
+        # короткие подписи для списка выбранных фонов
+        "bg_label_white": "белый",
+        "bg_label_beige": "бежевый",
+        "bg_label_pink": "розовый",
+        "bg_label_black": "чёрный",
+
+        "btn_next": "Далее",
+        "btn_back": "Назад",
+
+        "gender_choose_title": "Выберите пол модели:",
+        "btn_gender_female": "Женщина",
+        "btn_gender_male": "Мужчина",
+        "gender_selected_stub": (
+            "Пол модели сохранён. На следующем шаге будет выбор цвета волос, возраста, стиля и соотношения сторон."
+        ),
     },
 
     "en": {
@@ -439,5 +477,43 @@ phrases = {
         "btn_next": "Next",
         "btn_confirm_next": "Next",
         "btn_confirm_topup": "Top up balance",
+        "upload_doc_only": "Please send the photo as a document in original quality (without compression).",
+        "upload_doc_wrong_type": "This does not look like an image. Please send the clothing photo as a document (file).",
+
+        "multi_items_not_supported": "Currently the bot supports generation for a single item only. Multi-item flow is coming soon.",
+
+        "settings_intro_single": (
+            "You have uploaded {count} item. Next you will select background, model gender, age and hair color, "
+            "aspect ratio and photo style."
+        ),
+
+        "background_select_single": (
+            "Select one or more background colors to generate photos of your items on a model.\n"
+            "IMPORTANT: If you select multiple backgrounds, the number of generated photos "
+            "will be multiplied by the number of uploaded items."
+        ),
+        "background_selected_header": "Selected background colors:",
+        "background_need_one": "Please select at least one background color to continue.",
+
+        "btn_bg_white": "White background",
+        "btn_bg_beige": "Beige background",
+        "btn_bg_pink": "Pink background",
+        "btn_bg_black": "Black background",
+
+        "bg_label_white": "white",
+        "bg_label_beige": "beige",
+        "bg_label_pink": "pink",
+        "bg_label_black": "black",
+
+        "btn_next": "Next",
+        "btn_back": "Back",
+
+        "gender_choose_title": "Choose the model gender:",
+        "btn_gender_female": "Female",
+        "btn_gender_male": "Male",
+        "gender_selected_stub": (
+            "Model gender has been saved. The next steps will be hair color, age, style and aspect ratio."
+        ),
+
     },
 }

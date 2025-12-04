@@ -32,6 +32,8 @@ GEN_SCENARIO_PRICES: dict[str, int] = {
     "lower_body": 1,
 }
 
+BG_KEYS = ("white", "beige", "pink", "black")
+
 # --- локальные маппинги под конструктор промпта ---
 BG_LABELS = {
     "white": ("Белый", "White"),

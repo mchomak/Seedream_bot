@@ -347,9 +347,53 @@ def _build_lang_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def build_background_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
+    """
+    Клавиатура выбора фона с чекбоксами (галочки на выбранных цветах).
+    """
+    def btn_text(key: str, phrase_key: str) -> str:
+        base = T(lang, phrase_key)
+        return f"✅ {base}" if key in selected else base
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=btn_text("white", "btn_bg_white"),
+                    callback_data="gen:bg:white",
+                ),
+                InlineKeyboardButton(
+                    text=btn_text("beige", "btn_bg_beige"),
+                    callback_data="gen:bg:beige",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("pink", "btn_bg_pink"),
+                    callback_data="gen:bg:pink",
+                ),
+                InlineKeyboardButton(
+                    text=btn_text("black", "btn_bg_black"),
+                    callback_data="gen:bg:black",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_next"),
+                    callback_data="gen:bg:next",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_back"),
+                    callback_data="gen:back_to_types",
+                )
+            ],
+        ]
+    )
+
+
 # ---------- core router ----------
-
-
 def build_router(db: Database, seedream: SeedreamService) -> Router:
     """
     Primary router:
@@ -748,275 +792,219 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
 
     # --- Обработчик фото в рамках сценария генерации ---
-    # --- Фото: просим отправить как документ при ожидании загрузки ---
-
     @r.message(F.photo)
     async def on_photo_for_generation(m: Message, state: FSMContext):
         """
-        Если ждём документ для генерации, а пользователь прислал обычное фото:
-        - логируем тип сообщения
-        - просим отправить изображение как документ
-        - остаёмся в состоянии ожидания документа
+        Если ждём документ, но приходит photo — просим юзера отправить как документ.
+        Заодно логируем тип сообщения.
         """
-        from fsm import GenerationFlow  # чтобы не тащить наверх
-
-        # логируем тип
-        logger.info(
-            "Incoming photo message",
-            extra={
-                "user_id": m.from_user.id if m.from_user else None,
-                "content_type": m.content_type,
-                "has_photo": bool(m.photo),
-                "has_document": bool(m.document),
-            },
-        )
+        from fsm import GenerationFlow
 
         current_state = await state.get_state()
-        if current_state == GenerationFlow.waiting_document.state:
-            lang = await get_lang(m, db)
-            await m.answer(T(lang, "upload_doc_wrong_type"))
-            # состояние не трогаем, всё ещё ждём документ
-        else:
-            # вне контекста генерации просто игнорируем (можно добавить свою реакцию)
+        # Логируем тип сообщения, чтобы ты видел в консоли
+        logger.info(
+            "Incoming message from %s: content_type=%s, media_group_id=%s",
+            m.from_user.id,
+            m.content_type,
+            getattr(m, "media_group_id", None),
+        )
+
+        if current_state != GenerationFlow.waiting_document.state:
+            # Фото не в контексте генерации — ничего не делаем
             return
+
+        lang = await get_lang(m, db)
+        await m.answer(T(lang, "upload_doc_only"))
 
 
     # --- Обработчик изображения-документа в рамках генерации ---
     @r.message(F.document)
     async def on_document_for_generation(m: Message, state: FSMContext):
         """
-        Если мы в состоянии GenerationFlow.waiting_document:
-        - забираем документ (image/*)
-        - загружаем фото в KIE (upload_image_bytes)
-        - сохраняем URL в FSM
-        - запускаем конструктор промпта (шаг 1: фон)
+        Принимаем 1 фото одежды в виде документа.
+        Сценарий >1 фото пока заглушка.
+        После первого валидного документа сразу переходим к выбору фона.
         """
         from fsm import GenerationFlow
-        from db import GeneratedImage, ImageRole  # на будущее, здесь пока не нужны
-
-        # логируем тип сообщения
-        logger.info(
-            "Incoming document message",
-            extra={
-                "user_id": m.from_user.id if m.from_user else None,
-                "content_type": m.content_type,
-                "mime_type": m.document.mime_type if m.document else None,
-                "has_photo": bool(m.photo),
-                "has_document": bool(m.document),
-            },
-        )
 
         current_state = await state.get_state()
         if current_state != GenerationFlow.waiting_document.state:
+            # Документ пришёл не в контексте генерации
             return
 
         lang = await get_lang(m, db)
-
         data = await state.get_data()
-        prompt_msg_id = data.get("generate_prompt_msg_id")
-        prompt_chat_id = data.get("generate_chat_id") or m.chat.id
-        upload_type = data.get("upload_type") or "flat"
+
+        # Заглушка на сценарий с несколькими фото
+        num_items = int(data.get("num_items") or 0)
+        if num_items >= 1:
+            await m.answer(T(lang, "multi_items_not_supported"))
+            return
 
         doc = m.document
-        mime = doc.mime_type or ""
+        mime = (doc.mime_type or "").lower()
+        logger.info(
+            "Incoming document from %s: mime=%s, file_id=%s",
+            m.from_user.id,
+            mime,
+            doc.file_id,
+        )
+
         if not mime.startswith("image/"):
             await m.answer(T(lang, "upload_doc_wrong_type"))
             return
 
-        # 1) редактируем подсказку: "обрабатываю загрузку…"
-        if prompt_msg_id:
-            try:
-                await m.bot.edit_message_text(
-                    chat_id=prompt_chat_id,
-                    message_id=prompt_msg_id,
-                    text=T(lang, "processing_generation"),
-                )
-            except Exception:
-                pass
-
-        # 2) достаём байты изображения из Telegram
-        file = await m.bot.get_file(doc.file_id)
-        buf = BytesIO()
-        await m.bot.download_file(file.file_path, destination=buf)
-        cloth_bytes = buf.getvalue()
-
-        # 3) грузим файл в KIE (upload_image_bytes) — синхронно, выносим в to_thread
-        try:
-            cloth_url = await asyncio.to_thread(
-                seedream.upload_image_bytes,
-                cloth_bytes,
-                doc.file_name or f"{doc.file_id}.jpg",
-            )
-        except Exception as e:
-            await state.clear()
-            err_text = T(lang, "generation_failed")
-            if prompt_msg_id:
-                try:
-                    await m.bot.edit_message_text(
-                        chat_id=prompt_chat_id,
-                        message_id=prompt_msg_id,
-                        text=err_text,
-                    )
-                except Exception:
-                    await m.answer(err_text)
-            else:
-                await m.answer(err_text)
-            logger.exception("Seedream upload_image_bytes failed", exc_info=e)
-            return
-
-        # 4) сохраняем данные по загруженной вещи в FSM
+        # Сохраняем в стейт только file_id – байты докачаем перед генерацией
+        upload_type = data.get("upload_type") or "flat"
         await state.update_data(
-            cloth_urls=[cloth_url],
+            cloth_file_ids=[doc.file_id],
             num_items=1,
             upload_type=upload_type,
-            # дефолты параметров (могут быть переопределены на шагах)
-            gender="female",
-            hair="any",
-            age="young",
-            style="casual",
-            aspect="3_4",
+            backgrounds=[],
+            gender=None,
+            hair_color=None,
+            age=None,
+            style=None,
+            aspect_ratios=[],
         )
 
-        # 5) показываем интро по настройкам и переходим к выбору фона
+        # Формируем текст шага про фон
         intro_text = T(lang, "settings_intro_single", count=1)
-        bg_kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_bg_white"),
-                        callback_data="gen:bg:white",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_bg_beige"),
-                        callback_data="gen:bg:beige",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_bg_pink"),
-                        callback_data="gen:bg:pink",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_bg_black"),
-                        callback_data="gen:bg:black",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_next"),
-                        callback_data="gen:bg:next",
-                    ),
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_back"),
-                        callback_data="gen:back_to_types",
-                    ),
-                ],
-            ]
+        bg_text = T(lang, "background_select_single")
+
+        full_text = intro_text + "\n\n" + bg_text
+
+        # Показываем выбор фона НОВЫМ сообщением
+        kb = build_background_keyboard(lang, selected=set())
+        sent = await m.answer(full_text, reply_markup=kb)
+
+        # Обновляем "рабочее" сообщение для дальнейших редактирований
+        await state.update_data(
+            generate_prompt_msg_id=sent.message_id,
+            generate_chat_id=sent.chat.id,
         )
-
-        full_text = intro_text + "\n\n" + T(lang, "settings_background_title")
-
-        try:
-            if prompt_msg_id:
-                await m.bot.edit_message_text(
-                    chat_id=prompt_chat_id,
-                    message_id=prompt_msg_id,
-                    text=full_text,
-                    reply_markup=bg_kb,
-                )
-            else:
-                sent = await m.answer(full_text, reply_markup=bg_kb)
-                await state.update_data(
-                    generate_prompt_msg_id=sent.message_id,
-                    generate_chat_id=sent.chat.id,
-                )
-        except Exception:
-            sent = await m.answer(full_text, reply_markup=bg_kb)
-            await state.update_data(
-                generate_prompt_msg_id=sent.message_id,
-                generate_chat_id=sent.chat.id,
-            )
 
         await state.set_state(GenerationFlow.choosing_background)
 
 
-    @r.callback_query(F.data.startswith("gen:bg:"))
-    async def on_gen_choose_background(q: CallbackQuery, state: FSMContext):
+    @r.callback_query(F.data == "gen:back_to_background")
+    async def on_gen_back_to_background(q: CallbackQuery, state: FSMContext):
+        """
+        Возврат со шага выбора пола обратно к выбору фона.
+        """
         from fsm import GenerationFlow
 
-        current = await state.get_state()
-        if current != GenerationFlow.choosing_background.state:
+        lang = await get_lang(q, db)
+        data = await state.get_data()
+
+        selected = set(data.get("backgrounds") or [])
+        intro_text = T(lang, "settings_intro_single", count=data.get("num_items") or 1)
+        base_text = T(lang, "background_select_single")
+
+        if selected:
+            labels = [
+                T(lang, f"bg_label_{key}")
+                for key in BG_KEYS
+                if key in selected
+            ]
+            selected_block = (
+                T(lang, "background_selected_header")
+                + "\n"
+                + "\n".join(labels)
+            )
+            full_text = intro_text + "\n\n" + base_text + "\n\n" + selected_block
+        else:
+            full_text = intro_text + "\n\n" + base_text
+
+        kb = build_background_keyboard(lang, selected)
+
+        try:
+            await q.message.edit_text(full_text, reply_markup=kb)
+        except Exception:
+            await q.message.edit_caption(full_text, reply_markup=kb)
+
+        await state.set_state(GenerationFlow.choosing_background)
+        await q.answer()
+
+
+    @r.callback_query(F.data.startswith("gen:bg:"))
+    async def on_gen_choose_background(q: CallbackQuery, state: FSMContext):
+        """
+        Мультивыбор фона:
+        - gen:bg:white|beige|pink|black — тогаем выбранность с галочками
+        - gen:bg:next — сохраняем выбор и переходим к выбору пола
+        """
+        from fsm import GenerationFlow
+
+        current_state = await state.get_state()
+        if current_state != GenerationFlow.choosing_background.state:
             await q.answer()
             return
 
         lang = await get_lang(q, db)
         data = await state.get_data()
-        action = q.data.split(":", 2)[-1]
+        prompt_msg_id = data.get("generate_prompt_msg_id") or q.message.message_id
+        prompt_chat_id = data.get("generate_chat_id") or q.message.chat.id
 
-        # читаем текущий выбор
-        bg = data.get("background") or "white"
+        # Текущее множество выбранных фонов
+        selected = set(data.get("backgrounds") or [])
 
-        if action in ("white", "beige", "pink", "black"):
-            bg = action
-            await state.update_data(background=bg)
+        _, _, action = q.data.split(":", 2)
 
-            # просто обновляем текст (можно подсветить выбор, но пока без этого)
-            text_body = T(lang, "settings_background_title")
-            kb = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=T(lang, "btn_bg_white"),
-                            callback_data="gen:bg:white",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text=T(lang, "btn_bg_beige"),
-                            callback_data="gen:bg:beige",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text=T(lang, "btn_bg_pink"),
-                            callback_data="gen:bg:pink",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text=T(lang, "btn_bg_black"),
-                            callback_data="gen:bg:black",
-                        )
-                    ],
-                    [
-                        InlineKeyboardButton(
-                            text=T(lang, "btn_next"),
-                            callback_data="gen:bg:next",
-                        ),
-                        InlineKeyboardButton(
-                            text=T(lang, "btn_back"),
-                            callback_data="gen:back_to_types",
-                        ),
-                    ],
-                ]
-            )
+        # --- переключение конкретного цвета ---
+        if action in BG_KEYS:
+            if action in selected:
+                selected.remove(action)
+            else:
+                selected.add(action)
+
+            await state.update_data(backgrounds=list(selected))
+
+            # Пересобираем текст
+            intro_text = T(lang, "settings_intro_single", count=data.get("num_items") or 1)
+            base_text = T(lang, "background_select_single")
+
+            if selected:
+                # Читаемые названия выбранных фонов
+                labels = []
+                for key in BG_KEYS:
+                    if key in selected:
+                        labels.append(T(lang, f"bg_label_{key}"))
+                selected_block = (
+                    T(lang, "background_selected_header")
+                    + "\n"
+                    + "\n".join(labels)
+                )
+                full_text = intro_text + "\n\n" + base_text + "\n\n" + selected_block
+            else:
+                full_text = intro_text + "\n\n" + base_text
+
+            kb = build_background_keyboard(lang, selected)
+
             try:
-                await q.message.edit_text(text_body, reply_markup=kb)
+                await q.message.edit_text(full_text, reply_markup=kb)
             except Exception:
-                pass
+                await q.message.edit_caption(full_text, reply_markup=kb)
+
             await q.answer()
             return
 
+        # --- Next: идём к выбору пола ---
         if action == "next":
-            # если пользователь ничего не трогал, используем дефолт "white"
-            bg = data.get("background") or "white"
-            await state.update_data(background=bg)
+            if not selected:
+                # Не даём уйти дальше без хотя бы одного цвета
+                await q.answer(T(lang, "background_need_one"), show_alert=True)
+                return
 
-            # переходим к выбору пола
+            # Сохраняем список фонов + "основной" (первый) для дальнейшего использования
+            main_bg = next(iter(selected))
+            await state.update_data(
+                backgrounds=list(selected),
+                background=main_bg,
+            )
+
+            # Переход к выбору пола (редактируем текущее сообщение)
+            gender_text = T(lang, "gender_choose_title")
             kb = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -1034,91 +1022,49 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                     [
                         InlineKeyboardButton(
                             text=T(lang, "btn_back"),
-                            callback_data="gen:bg:back",
+                            callback_data="gen:back_to_background",
                         )
                     ],
                 ]
             )
+
             try:
-                await q.message.edit_text(
-                    T(lang, "settings_gender_title"),
-                    reply_markup=kb,
-                )
+                await q.message.edit_text(gender_text, reply_markup=kb)
             except Exception:
-                await q.message.answer(
-                    T(lang, "settings_gender_title"),
-                    reply_markup=kb,
-                )
+                await q.message.edit_caption(gender_text, reply_markup=kb)
 
             await state.set_state(GenerationFlow.choosing_gender)
             await q.answer()
             return
 
-        if action == "back":
-            # возврат к выбору типа фото
-            await q.answer()
-            await on_gen_back_to_types(q, state)
-            return
-        
+        await q.answer()
+
 
     @r.callback_query(F.data.startswith("gen:gender:"))
     async def on_gen_choose_gender(q: CallbackQuery, state: FSMContext):
+        """
+        Выбор пола модели. Пока просто сохраняем в стейт и показываем заглушку.
+        Дальнейшие шаги (волосы, возраст, стиль, соотношение сторон) добавим отдельно.
+        """
         from fsm import GenerationFlow
 
-        current = await state.get_state()
-        if current != GenerationFlow.choosing_gender.state:
+        current_state = await state.get_state()
+        if current_state != GenerationFlow.choosing_gender.state:
             await q.answer()
             return
 
         lang = await get_lang(q, db)
-        _, _, gender = q.data.partition("gen:gender:")
+        _, _, gender = q.data.split(":", 2)
         if gender not in ("female", "male"):
             await q.answer()
             return
 
         await state.update_data(gender=gender)
 
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_hair_any"),
-                        callback_data="gen:hair:any",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_hair_dark"),
-                        callback_data="gen:hair:dark",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_hair_light"),
-                        callback_data="gen:hair:light",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_back"),
-                        callback_data="gen:bg:next",  # шаг назад к выбору фона
-                    )
-                ],
-            ]
-        )
-
-        try:
-            await q.message.edit_text(
-                T(lang, "settings_hair_title"),
-                reply_markup=kb,
-            )
-        except Exception:
-            await q.message.answer(
-                T(lang, "settings_hair_title"),
-                reply_markup=kb,
-            )
-
-        await state.set_state(GenerationFlow.choosing_hair)
+        # На этом шаге просто подтверждаем выбор и гасим стейт.
+        # На следующем шаге будем вести пользователя дальше (волосы и т.д.).
+        await q.message.edit_text(T(lang, "gender_selected_stub"))
+        await state.clear()
         await q.answer()
 
 
