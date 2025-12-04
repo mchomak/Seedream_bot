@@ -1043,8 +1043,9 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     @r.callback_query(F.data.startswith("gen:gender:"))
     async def on_gen_choose_gender(q: CallbackQuery, state: FSMContext):
         """
-        Выбор пола модели. Пока просто сохраняем в стейт и показываем заглушку.
-        Дальнейшие шаги (волосы, возраст, стиль, соотношение сторон) добавим отдельно.
+        Выбор пола модели:
+        - сохраняем gender
+        - показываем шаг выбора цвета волос (один вариант из трёх)
         """
         from fsm import GenerationFlow
 
@@ -1059,12 +1060,52 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             await q.answer()
             return
 
+        # Сохраняем пол модели в стейт
         await state.update_data(gender=gender)
 
-        # На этом шаге просто подтверждаем выбор и гасим стейт.
-        # На следующем шаге будем вести пользователя дальше (волосы и т.д.).
-        await q.message.edit_text(T(lang, "gender_selected_stub"))
-        await state.clear()
+        # Клавиатура выбора цвета волос (один вариант)
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_hair_any"),
+                        callback_data="gen:hair:any",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_hair_dark"),
+                        callback_data="gen:hair:dark",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_hair_light"),
+                        callback_data="gen:hair:light",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_back"),
+                        callback_data="gen:back_to_background",
+                    )
+                ],
+            ]
+        )
+
+        # Показываем следующий шаг (выбор волос)
+        try:
+            await q.message.edit_text(
+                T(lang, "settings_hair_title"),
+                reply_markup=kb,
+            )
+        except Exception:
+            await q.message.answer(
+                T(lang, "settings_hair_title"),
+                reply_markup=kb,
+            )
+
+        await state.set_state(GenerationFlow.choosing_hair)
         await q.answer()
 
 
@@ -1289,41 +1330,50 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         # --- формируем summary ---
         data = await state.get_data()
         num_items = int(data.get("num_items") or 1)
+
+        # основной ключ фона (первый выбранный, если почему-то нет списка)
         bg_key = data.get("background") or "white"
+        backgrounds = data.get("backgrounds") or [bg_key]
+        backgrounds = list(dict.fromkeys(backgrounds))  # на всякий случай убираем дубли
+
         gender = data.get("gender") or "female"
         hair = data.get("hair") or "any"
         age = data.get("age") or "young"
         style = data.get("style") or "casual"
 
-        # читаем баланс
-        async with db.session() as s:
-            prof = await get_profile(s, tg_user_id=q.from_user.id)
-            balance = prof.credits_balance
-
-        # пока генерируем по одному фото
-        photos = num_items  # в будущем сюда войдёт произведение выборов
-
-        # локализованные подписи
+        # читаемые подписи
         if lang == "ru":
-            bg_label = BG_LABELS[bg_key][0]
+            bg_labels = [BG_LABELS[k][0] for k in backgrounds if k in BG_LABELS]
             gender_label = GENDER_LABELS[gender][0]
             hair_label = HAIR_LABELS[hair][0]
             age_label = AGE_LABELS[age][0]
             style_label = STYLE_LABELS[style][0]
             aspect_label = ASPECT_LABELS[aspect][0]
         else:
-            bg_label = BG_LABELS[bg_key][1]
+            bg_labels = [BG_LABELS[k][1] for k in backgrounds if k in BG_LABELS]
             gender_label = GENDER_LABELS[gender][1]
             hair_label = HAIR_LABELS[hair][1]
             age_label = AGE_LABELS[age][1]
             style_label = STYLE_LABELS[style][1]
             aspect_label = ASPECT_LABELS[aspect][1]
 
+        # строка с фонами через запятую
+        background_str = ", ".join(bg_labels) if bg_labels else "-"
+
+        # читаем баланс
+        async with db.session() as s:
+            prof = await get_profile(s, tg_user_id=q.from_user.id)
+            balance = prof.credits_balance
+
+        # считаем количество фото:
+        # 1 вещь × N фонов (остальные параметры пока по одному)
+        photos = num_items * max(len(backgrounds), 1)
+
         base_text = T(
             lang,
             "confirm_generation_title",
             items=num_items,
-            background=bg_label,
+            background=background_str,
             gender=gender_label,
             hair=hair_label,
             age=age_label,
@@ -1377,13 +1427,15 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
 
     @r.callback_query(F.data.startswith("gen:confirm:"))
-    async def on_gen_confirm(q: CallbackQuery, state: FSMContext):
+    async def on_gen_confirm(q: CallbackQuery, state: FSMContext, bot: Bot):
         """
         Подтверждение генерации:
-        - проверяем баланс
-        - собираем промпт из выбранных параметров
-        - создаём Generation + списываем кредиты
-        - вызываем Seedream API, ждём результат, сохраняем в БД и отправляем фото
+        - проверяем действие (далее / пополнить)
+        - скачиваем фото одежды из Telegram
+        - загружаем в Seedream (получаем cloth_url)
+        - собираем промпты из выбранных параметров (по одному на каждый фон)
+        - создаём одну запись Generation + списываем кредиты
+        - создаём несколько задач Seedream (по фону), ждём результаты, сохраняем в БД и отправляем все фото
         """
         from fsm import GenerationFlow
         from db import GeneratedImage, ImageRole  # локальный импорт
@@ -1396,28 +1448,68 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         lang = await get_lang(q, db)
         action = q.data.split(":", 2)[-1]
 
+        # Отвечаем на callback сразу, чтобы не получить timeout от Telegram
+        await q.answer()
+
         if action == "topup":
-            # просто подсказка про /buy
-            await q.answer()
             await q.message.answer(T(lang, "no_credits"))
             return
 
         if action != "next":
-            await q.answer()
             return
 
         data = await state.get_data()
-        cloth_urls = data.get("cloth_urls") or []
-        if not cloth_urls:
-            await q.answer()
+
+        # --- 1. Забираем file_id документа с одеждой ---
+        cloth_file_ids = data.get("cloth_file_ids") or []
+        if not cloth_file_ids:
             await q.message.answer(T(lang, "generation_failed"))
             await state.clear()
             return
 
-        cloth_url = cloth_urls[0]
+        tg_file_id = cloth_file_ids[0]
+
+        # --- 2. Скачиваем байты файла из Telegram ---
+        file_buf = BytesIO()
+        try:
+            await bot.download(file=tg_file_id, destination=file_buf)
+            file_buf.seek(0)
+            cloth_bytes = file_buf.read()
+        except Exception as e:
+            await state.clear()
+            err_text = T(lang, "generation_failed")
+            try:
+                await q.message.edit_text(err_text)
+            except Exception:
+                await q.message.answer(err_text)
+            logger.exception("Telegram file download failed", exc_info=e)
+            return
+
+        # --- 3. Заливаем это фото в Seedream и получаем cloth_url ---
+        try:
+            cloth_url = await asyncio.to_thread(
+                seedream.upload_image_bytes,
+                cloth_bytes,
+                f"cloth_{tg_file_id}.jpg",
+            )
+        except Exception as e:
+            await state.clear()
+            err_text = T(lang, "generation_failed")
+            try:
+                await q.message.edit_text(err_text)
+            except Exception:
+                await q.message.answer(err_text)
+            logger.exception("Seedream upload_image_bytes failed", exc_info=e)
+            return
+
         upload_type = data.get("upload_type") or "flat"
 
+        # список выбранных фонов (как ключи: white / beige / pink / black)
         bg_key = data.get("background") or "white"
+        backgrounds = data.get("backgrounds") or [bg_key]
+        # убираем дубли, сохраняем порядок
+        backgrounds = list(dict.fromkeys(backgrounds))
+
         gender = data.get("gender") or "female"
         hair = data.get("hair") or "any"
         age = data.get("age") or "young"
@@ -1425,28 +1517,31 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         aspect = data.get("aspect") or "3_4"
 
         # мапим в сниппеты
-        background_snippet = BG_SNIPPETS[bg_key]
+        main_bg_snippet = BG_SNIPPETS[bg_key]
         hair_snippet = HAIR_SNIPPETS[hair]
         age_snippet = AGE_SNIPPETS[age]
         style_snippet = STYLE_SNIPPETS[style]
         image_size, image_resolution = ASPECT_PARAMS[aspect]
 
-        # считаем, сколько фото планируем (пока = 1 * items)
+        # --- 4. Считаем, сколько фото реально планируем ---
         num_items = int(data.get("num_items") or 1)
-        total_images_planned = num_items  # на будущее можно расширить
+        total_images_planned = num_items * max(len(backgrounds), 1)
 
-        # проверяем баланс и создаём Generation
+        # --- 5. Проверяем баланс и создаём Generation (одну запись на весь набор) ---
         async with db.session() as s:
+            # промпт, который кладём в БД как "общий" (по основному фону)
+            prompt_for_record = seedream.build_ecom_prompt(
+                gender=gender,
+                hair_color=hair_snippet,
+                age=age_snippet,
+                style_snippet=style_snippet,
+                background_snippet=main_bg_snippet,
+            )
+
             gen_obj, user, price = await ensure_credits_and_create_generation(
                 s,
                 tg_user_id=q.from_user.id,
-                prompt=seedream.build_ecom_prompt(
-                    gender=gender,
-                    hair_color=hair_snippet,
-                    age=age_snippet,
-                    style_snippet=style_snippet,
-                    background_snippet=background_snippet,
-                ),
+                prompt=prompt_for_record,
                 scenario_key="initial_generation",
                 total_images_planned=total_images_planned,
                 params={
@@ -1457,6 +1552,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                     "age": age,
                     "style": style,
                     "background": bg_key,
+                    "backgrounds": backgrounds,
                     "aspect": aspect,
                     "image_size": image_size,
                     "image_resolution": image_resolution,
@@ -1467,7 +1563,6 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             if gen_obj is None:
                 # кредитов не хватило
                 await state.clear()
-                await q.answer()
                 try:
                     await q.message.edit_text(T(lang, "no_credits"))
                 except Exception:
@@ -1476,31 +1571,33 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
             generation_id = gen_obj.id
 
-        # промпт ещё раз, уже для API
-        prompt = seedream.build_ecom_prompt(
-            gender=gender,
-            hair_color=hair_snippet,
-            age=age_snippet,
-            style_snippet=style_snippet,
-            background_snippet=background_snippet,
-        )
-
-        # обновляем текст: задача в обработке
+        # --- 6. Обновляем текст: задача(и) в обработке ---
         try:
             await q.message.edit_text(T(lang, "processing_generation"))
         except Exception:
             await q.message.answer(T(lang, "processing_generation"))
 
-        # создаём задачу Seedream
+        # --- 7. Создаём задачи Seedream по количеству выбранных фонов ---
         try:
-            task_id = await asyncio.to_thread(
-                seedream.create_task,
-                prompt,
-                image_size=image_size,
-                image_resolution=image_resolution,
-                max_images=total_images_planned,
-                image_urls=[cloth_url],
-            )
+            task_ids: list[str] = []
+            for bg in backgrounds:
+                bg_snip = BG_SNIPPETS[bg]
+                prompt_for_task = seedream.build_ecom_prompt(
+                    gender=gender,
+                    hair_color=hair_snippet,
+                    age=age_snippet,
+                    style_snippet=style_snippet,
+                    background_snippet=bg_snip,
+                )
+                task_id = await asyncio.to_thread(
+                    seedream.create_task,
+                    prompt_for_task,
+                    image_size=image_size,
+                    image_resolution=image_resolution,
+                    max_images=num_items,  # по одной картинке на вещь для каждого фона
+                    image_urls=[cloth_url],
+                )
+                task_ids.append(task_id)
         except Exception as e:
             # откат статуса и возврат кредитов
             async with db.session() as s:
@@ -1527,11 +1624,10 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 await q.message.edit_text(err_text)
             except Exception:
                 await q.message.answer(err_text)
-            logger.exception("Seedream create_task failed", exc_info=e)
-            await q.answer()
+            logger.exception("Seedream create_task (multi-bg) failed", exc_info=e)
             return
 
-        # обновляем Generation: external_id + статус running
+        # --- 8. Обновляем Generation: external_id + статус running ---
         async with db.session() as s:
             gen_db: Optional[Generation] = (
                 await s.execute(
@@ -1539,41 +1635,46 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 )
             ).scalar_one_or_none()
             if gen_db:
-                gen_db.external_id = task_id
+                gen_db.external_id = ",".join(task_ids)
                 gen_db.status = GenerationStatus.running
 
-        # уведомляем пользователя, что задача в очереди
-        notify_text = T(lang, "task_queued", task_id=task_id)
+        # --- 9. Уведомляем пользователя, что задачи в очереди ---
+        first_task_id = task_ids[0] if task_ids else "-"
+        notify_text = T(lang, "task_queued", task_id=first_task_id)
         try:
             await q.message.edit_text(notify_text)
         except Exception:
             await q.message.answer(notify_text)
 
-        # ждём результат, скачиваем картинки
+        # --- 10. Ждём результаты всех задач и скачиваем картинки ---
         try:
-            task_info = await asyncio.to_thread(
-                seedream.wait_for_result,
-                task_id,
-                poll_interval=5.0,
-                timeout=180.0,
-            )
-            data_info = task_info.get("data", {})
-            result_json_str = data_info.get("resultJson")
-            if not result_json_str:
-                raise RuntimeError(f"No resultJson in task_info={task_info!r}")
+            image_records: list[tuple[str, bytes, str]] = []  # (resultUrl, bytes, bg_key)
 
-            result_obj = json.loads(result_json_str)
-            result_urls = result_obj.get("resultUrls") or []
-            if not result_urls:
-                raise RuntimeError(f"No resultUrls in resultJson={result_obj!r}")
-
-            image_bytes_list: list[tuple[str, bytes]] = []
-            for url in result_urls:
-                download_url = await asyncio.to_thread(seedream.get_download_url, url)
-                img_bytes = await asyncio.to_thread(
-                    seedream.download_file_bytes, download_url
+            for bg, task_id in zip(backgrounds, task_ids):
+                task_info = await asyncio.to_thread(
+                    seedream.wait_for_result,
+                    task_id,
+                    poll_interval=5.0,
+                    timeout=180.0,
                 )
-                image_bytes_list.append((url, img_bytes))
+                data_info = task_info.get("data", {})
+                result_json_str = data_info.get("resultJson")
+                if not result_json_str:
+                    raise RuntimeError(f"No resultJson in task_info={task_info!r}")
+
+                result_obj = json.loads(result_json_str)
+                result_urls = result_obj.get("resultUrls") or []
+                if not result_urls:
+                    raise RuntimeError(f"No resultUrls in resultJson={result_obj!r}")
+
+                for url in result_urls:
+                    download_url = await asyncio.to_thread(
+                        seedream.get_download_url, url
+                    )
+                    img_bytes = await asyncio.to_thread(
+                        seedream.download_file_bytes, download_url
+                    )
+                    image_records.append((url, img_bytes, bg))
 
         except Exception as e:
             # mark failed, return credits
@@ -1601,11 +1702,10 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 await q.message.edit_text(err_text)
             except Exception:
                 await q.message.answer(err_text)
-            logger.exception("Seedream wait_for_result/download failed", exc_info=e)
-            await q.answer()
+            logger.exception("Seedream wait_for_result/download (multi-bg) failed", exc_info=e)
             return
 
-        # сохраняем результат в БД
+        # --- 11. Сохраняем результат в БД ---
         async with db.session() as s:
             gen_db: Optional[Generation] = (
                 await s.execute(
@@ -1615,10 +1715,10 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
             if gen_db:
                 gen_db.status = GenerationStatus.succeeded
-                gen_db.images_generated = len(result_urls)
+                gen_db.images_generated = len(image_records)
                 gen_db.finished_at = datetime.now(timezone.utc)
 
-                for url, _bytes in image_bytes_list:
+                for url, _bytes, bg_for_img in image_records:
                     img = GeneratedImage(
                         generation_id=gen_db.id,
                         user_id=q.from_user.id,
@@ -1634,45 +1734,56 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                             "hair": hair,
                             "age": age,
                             "style": style,
-                            "background": bg_key,
+                            "background": bg_for_img,
+                            "backgrounds": backgrounds,
                             "aspect": aspect,
                         },
                     )
                     s.add(img)
 
-        # отправляем пользователю первую картинку
+        # --- 12. Отправляем пользователю ВСЕ картинки и связываем их с БД ---
         from aiogram.types import BufferedInputFile
 
-        first_url, first_bytes = image_bytes_list[0]
-        sent_photo = await q.message.answer_photo(
-            photo=BufferedInputFile(first_bytes, filename="seedream_initial.png"),
-            caption=T(lang, "generation_done"),
-        )
+        if not image_records:
+            await q.message.answer(T(lang, "generation_failed"))
+            await state.clear()
+            return
 
-        # обновляем telegram_file_id для первой картинки
+        sent_messages: list[tuple[str, Any]] = []  # (storage_url, Message)
+
+        for idx, (url, img_bytes, _bg) in enumerate(image_records, start=1):
+            caption = T(lang, "generation_done") if idx == 1 else None
+            msg = await q.message.answer_photo(
+                photo=BufferedInputFile(img_bytes, filename=f"seedream_initial_{idx}.png"),
+                caption=caption,
+            )
+            sent_messages.append((url, msg))
+
+        # Проставляем telegram_file_id для каждой картинки
         async with db.session() as s:
-            first_img: Optional[GeneratedImage] = (
-                await s.execute(
-                    select(GeneratedImage)
-                    .where(
-                        GeneratedImage.generation_id == generation_id,
-                        GeneratedImage.user_id == q.from_user.id,
+            for url, msg in sent_messages:
+                if not msg.photo:
+                    continue
+                tele_file_id = msg.photo[-1].file_id
+                img_db: Optional[GeneratedImage] = (
+                    await s.execute(
+                        select(GeneratedImage).where(
+                            GeneratedImage.generation_id == generation_id,
+                            GeneratedImage.user_id == q.from_user.id,
+                            GeneratedImage.storage_url == url,
+                        )
                     )
-                    .order_by(GeneratedImage.id.asc())
-                )
-            ).scalars().first()
-
-            if first_img and sent_photo.photo:
-                first_img.telegram_file_id = sent_photo.photo[-1].file_id
+                ).scalar_one_or_none()
+                if img_db:
+                    img_db.telegram_file_id = tele_file_id
 
         await state.clear()
 
+        # Дополнительно помечаем в исходном сообщении, что генерация завершена
         try:
             await q.message.edit_text(T(lang, "generation_done"))
         except Exception:
             pass
-
-        await q.answer()
 
 
     # --- payments flow ---
