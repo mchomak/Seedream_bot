@@ -62,8 +62,19 @@ class PaymentFlow(StatesGroup):
     waiting = State()  # waiting for successful_payment
 
 
-# ---------- payment meta ----------
+class GenerationFlow(StatesGroup):
+    selecting_upload_type = State()
+    waiting_document = State()
+    choosing_background = State()
+    choosing_gender = State()
+    choosing_hair = State()
+    choosing_age = State()
+    choosing_style = State()
+    choosing_aspect = State()
+    confirming = State()
 
+
+# ---------- payment meta ----------
 @dataclass
 class PaymentMeta:
     chat_id: int

@@ -16,6 +16,7 @@ from setup_log import (
     setup_logging,
     report_exception,
 )
+from seedream_service import SeedreamService
 
 
 async def main() -> None:
@@ -34,6 +35,10 @@ async def main() -> None:
         default=DefaultBotProperties(parse_mode="HTML"),
     )
     dp = Dispatcher(storage=storage)
+    seedream = SeedreamService(
+        api_key=settings.seedream_api,
+        timeout=60
+    )
 
     # 5) Optional Telegram alerts dispatcher for CRITICAL logs
     alerts_queue_put = None
@@ -58,7 +63,7 @@ async def main() -> None:
     await install_bot_commands(bot, lang="ru")  # or "en"
 
     # 8) Routers: core handlers + tests + diagnostics
-    dp.include_router(build_router(db))
+    dp.include_router(build_router(db, seedream))
     dp.include_router(build_fsm_diag_router(settings.redis_url or ""))
 
     try:
