@@ -2672,74 +2672,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                     failed_on_create += 1
                                     logger.exception("Seedream create_task failed (all-mode)", extra={"error": repr(e)})
 
-        # --- 7. обновляем текст: генерация запущена ---
-        try:
-            await q.message.edit_text(T(lang, "processing_generation"))
-        except Exception:
-            await q.message.answer(T(lang, "processing_generation"))
-
-        # --- 8. создаём задачи Seedream по всем комбинациям (с защитой от падений create_task) ---
-        task_meta_list: list[dict[str, Any]] = []
-        failed_on_create = 0
-
-        for bg in backgrounds:
-            bg_snip = BG_SNIPPETS[bg]
-
-            for hair_code in hair_combo_codes:
-                hair_snip = HAIR_SNIPPETS[hair_code] if hair_code else None
-
-                for style_code in style_options:
-                    style_snip = STYLE_SNIPPETS[style_code]
-
-                    for asp in aspect_options:
-                        image_size, image_resolution = ASPECT_PARAMS[asp]
-
-                        prompt_for_task = seedream.build_ecom_prompt(
-                            gender=gender,
-                            hair_color=hair_snip,
-                            age=age_snippet,
-                            style_snippet=style_snip,
-                            background_snippet=bg_snip,
-                        )
-
-                        try:
-                            task_id = await asyncio.to_thread(
-                                seedream.create_task,
-                                prompt_for_task,
-                                image_size=image_size,
-                                image_resolution=image_resolution,
-                                max_images=num_items,
-                                image_urls=[cloth_url],
-                            )
-
-                            task_meta_list.append(
-                                {
-                                    "task_id": task_id,
-                                    "background": bg,
-                                    "hair": hair_code or "any",
-                                    "style": style_code,
-                                    "aspect": asp,
-                                    # доп. данные для ретраев
-                                    "prompt": prompt_for_task,
-                                    "image_size": image_size,
-                                    "image_resolution": image_resolution,
-                                    "max_images": num_items,
-                                    "cloth_url": cloth_url,
-                                }
-                            )
-                        except Exception as e:
-                            failed_on_create += 1
-                            logger.exception(
-                                "Seedream create_task failed for combo",
-                                extra={
-                                    "background": bg,
-                                    "hair": hair_code,
-                                    "style": style_code,
-                                    "aspect": asp,
-                                    "error": repr(e),
-                                },
-                            )
-                            # не падаем, просто эту комбинацию пропускаем
+        # Note: task_meta_list is already built per selected mode above
 
         # Если вообще не удалось создать ни одной задачи — откатываем генерацию
         if not task_meta_list:
