@@ -2438,45 +2438,22 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 aspects = list(dict.fromkeys(item.get("aspects") or [item.get("aspect") or "3_4"]))
                 return bgs, hair_combo, styles, aspects
 
-            total_images_planned = 0
+            # Calculate total number of combinations
+            total_combinations = 0
             for it in pis:
                 bgs, hair_combo, styles, aspects = _item_counts(it)
-                total_images_planned += max(len(bgs), 1) * (1 if hair_combo == [None] else len(hair_combo)) * max(len(styles), 1) * max(len(aspects), 1)
+                total_combinations += max(len(bgs), 1) * (1 if hair_combo == [None] else len(hair_combo)) * max(len(styles), 1) * max(len(aspects), 1)
 
-            # основные значения для записи
-            gender = (pis[0].get("gender") or "female") if pis else "female"
-            age = (pis[0].get("age") or "young") if pis else "young"
-            hair_main = (pis[0].get("hair") or "any") if pis else "any"
-            style_main = (pis[0].get("style") or "casual") if pis else "casual"
-            aspect_main = (pis[0].get("aspect") or "3_4") if pis else "3_4"
-            background_main = (pis[0].get("background") or "white") if pis else "white"
-
-            age_snippet = AGE_SNIPPETS.get(age)
-            prompt_for_record = seedream.build_ecom_prompt(
-                gender=gender,
-                hair_color=HAIR_SNIPPETS.get(hair_main),
-                age=age_snippet,
-                style_snippet=STYLE_SNIPPETS[style_main],
-                background_snippet=BG_SNIPPETS[background_main],
-            )
+            # Check if user has enough credits for ALL combinations (1 credit per combination)
+            price_per_generation = GEN_SCENARIO_PRICES.get("initial_generation", 1)
+            total_cost = total_combinations * price_per_generation
 
             async with db.session() as s:
-                gen_obj, user, price = await ensure_credits_and_create_generation(
-                    s,
-                    tg_user_id=q.from_user.id,
-                    prompt=prompt_for_record,
-                    scenario_key="initial_generation",
-                    total_images_planned=total_images_planned,
-                    params={
-                        "scenario": "per_item_generation",
-                        "upload_type": upload_type,
-                        "per_item": pis,
-                        "num_items": num_items,
-                    },
-                    source_image_urls=cloth_urls,
-                )
+                user_db = (
+                    await s.execute(select(User).where(User.user_id == q.from_user.id))
+                ).scalar_one_or_none()
 
-                if gen_obj is None:
+                if user_db is None:
                     await state.clear()
                     try:
                         await q.message.edit_text(T(lang, "no_credits"))
@@ -2484,7 +2461,14 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                         await q.message.answer(T(lang, "no_credits"))
                     return
 
-                generation_id = gen_obj.id
+                current_balance = int(user_db.credits_balance or 0)
+                if current_balance < total_cost:
+                    await state.clear()
+                    try:
+                        await q.message.edit_text(T(lang, "no_credits"))
+                    except Exception:
+                        await q.message.answer(T(lang, "no_credits"))
+                    return
 
             try:
                 await q.message.edit_text(T(lang, "processing_generation"))
@@ -2514,6 +2498,36 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                     style_snippet=style_snip,
                                     background_snippet=bg_snip,
                                 )
+
+                                # Create generation record and deduct credit for this specific combination
+                                async with db.session() as s:
+                                    gen_obj, user, price = await ensure_credits_and_create_generation(
+                                        s,
+                                        tg_user_id=q.from_user.id,
+                                        prompt=prompt_for_task,
+                                        scenario_key="initial_generation",
+                                        total_images_planned=1,
+                                        params={
+                                            "scenario": "per_item_generation",
+                                            "upload_type": upload_type,
+                                            "item_index": idx,
+                                            "background": bg,
+                                            "hair": hair_code or "any",
+                                            "style": style_code,
+                                            "aspect": asp,
+                                        },
+                                        source_image_urls=[cloth_url],
+                                    )
+
+                                    if gen_obj is None:
+                                        failed_on_create += 1
+                                        logger.warning(f"Failed to create generation for combo: bg={bg}, hair={hair_code}, style={style_code}, aspect={asp}")
+                                        continue
+
+                                    # Flush to ensure the ID is assigned
+                                    await s.flush()
+                                    generation_id = gen_obj.id
+
                                 try:
                                     task_id = await asyncio.to_thread(
                                         seedream.create_task,
@@ -2526,6 +2540,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                     task_meta_list.append(
                                         {
                                             "task_id": task_id,
+                                            "generation_id": generation_id,
                                             "background": bg,
                                             "hair": hair_code or "any",
                                             "style": style_code,
@@ -2537,7 +2552,33 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                             "cloth_url": cloth_url,
                                         }
                                     )
+
+                                    # Update generation status to running
+                                    async with db.session() as s:
+                                        gen_db = (
+                                            await s.execute(select(Generation).where(Generation.id == generation_id))
+                                        ).scalar_one_or_none()
+                                        if gen_db:
+                                            gen_db.external_id = task_id
+                                            gen_db.status = GenerationStatus.running
+
                                 except Exception as e:
+                                    # Task creation failed - mark generation as failed and refund credit
+                                    async with db.session() as s:
+                                        gen_db = (
+                                            await s.execute(select(Generation).where(Generation.id == generation_id))
+                                        ).scalar_one_or_none()
+                                        user_db = (
+                                            await s.execute(select(User).where(User.user_id == q.from_user.id))
+                                        ).scalar_one_or_none()
+
+                                        if gen_db:
+                                            gen_db.status = GenerationStatus.failed
+                                            gen_db.error_message = f"Task creation failed: {str(e)}"
+                                            gen_db.finished_at = datetime.now(timezone.utc)
+                                        if user_db and gen_db:
+                                            user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
                                     failed_on_create += 1
                                     logger.exception("Seedream create_task failed (per-item)", extra={"item": idx, "error": repr(e)})
 
@@ -2557,62 +2598,23 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             gender = data.get("gender") or "female"
 
             age_snippet = AGE_SNIPPETS.get(age)
-            main_bg = backgrounds[0]
-            main_bg_snippet = BG_SNIPPETS[main_bg]
-            main_hair_snippet = HAIR_SNIPPETS.get(hair_main)
-            main_style_snippet = STYLE_SNIPPETS[style_main]
-            main_image_size, main_image_resolution = ASPECT_PARAMS[aspect_main]
 
             bg_count = max(len(backgrounds), 1)
             hair_count = 1 if hair_combo_codes == [None] else len(hair_combo_codes)
             style_count = max(len(style_options), 1)
             aspect_count = max(len(aspect_options), 1)
-            total_images_planned = len(cloth_urls) * bg_count * hair_count * style_count * aspect_count
+            total_combinations = len(cloth_urls) * bg_count * hair_count * style_count * aspect_count
+
+            # Check if user has enough credits for ALL combinations (1 credit per combination)
+            price_per_generation = GEN_SCENARIO_PRICES.get("initial_generation", 1)
+            total_cost = total_combinations * price_per_generation
 
             async with db.session() as s:
-                prompt_for_record = seedream.build_ecom_prompt(
-                    gender=gender,
-                    hair_color=main_hair_snippet,
-                    age=age_snippet,
-                    style_snippet=main_style_snippet,
-                    background_snippet=main_bg_snippet,
-                )
+                user_db = (
+                    await s.execute(select(User).where(User.user_id == q.from_user.id))
+                ).scalar_one_or_none()
 
-                gen_obj, user, price = await ensure_credits_and_create_generation(
-                    s,
-                    tg_user_id=q.from_user.id,
-                    prompt=prompt_for_record,
-                    scenario_key="initial_generation",
-                    total_images_planned=total_images_planned,
-                    params={
-                        "scenario": "initial_generation",
-                        "upload_type": upload_type,
-                        "gender": gender,
-                        "age": age,
-                        "background": main_bg,
-                        "backgrounds": backgrounds,
-                        "hair": hair_main,
-                        "hair_options": hair_options,
-                        "style": style_main,
-                        "style_options": style_options,
-                        "aspect": aspect_main,
-                        "aspects": aspect_options,
-                        "aspect_params": {
-                            k: {
-                                "image_size": ASPECT_PARAMS[k][0],
-                                "image_resolution": ASPECT_PARAMS[k][1],
-                            }
-                            for k in aspect_options
-                            if k in ASPECT_PARAMS
-                        },
-                        "image_size": main_image_size,
-                        "image_resolution": main_image_resolution,
-                        "num_items": len(cloth_urls),
-                    },
-                    source_image_urls=cloth_urls,
-                )
-
-                if gen_obj is None:
+                if user_db is None:
                     await state.clear()
                     try:
                         await q.message.edit_text(T(lang, "no_credits"))
@@ -2620,7 +2622,14 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                         await q.message.answer(T(lang, "no_credits"))
                     return
 
-                generation_id = gen_obj.id
+                current_balance = int(user_db.credits_balance or 0)
+                if current_balance < total_cost:
+                    await state.clear()
+                    try:
+                        await q.message.edit_text(T(lang, "no_credits"))
+                    except Exception:
+                        await q.message.answer(T(lang, "no_credits"))
+                    return
 
             try:
                 await q.message.edit_text(T(lang, "processing_generation"))
@@ -2645,6 +2654,37 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                     style_snippet=style_snip,
                                     background_snippet=bg_snip,
                                 )
+
+                                # Create generation record and deduct credit for this specific combination
+                                async with db.session() as s:
+                                    gen_obj, user, price = await ensure_credits_and_create_generation(
+                                        s,
+                                        tg_user_id=q.from_user.id,
+                                        prompt=prompt_for_task,
+                                        scenario_key="initial_generation",
+                                        total_images_planned=1,
+                                        params={
+                                            "scenario": "initial_generation",
+                                            "upload_type": upload_type,
+                                            "gender": gender,
+                                            "age": age,
+                                            "background": bg,
+                                            "hair": hair_code or "any",
+                                            "style": style_code,
+                                            "aspect": asp,
+                                        },
+                                        source_image_urls=[cloth_url],
+                                    )
+
+                                    if gen_obj is None:
+                                        failed_on_create += 1
+                                        logger.warning(f"Failed to create generation for combo: bg={bg}, hair={hair_code}, style={style_code}, aspect={asp}")
+                                        continue
+
+                                    # Flush to ensure the ID is assigned
+                                    await s.flush()
+                                    generation_id = gen_obj.id
+
                                 try:
                                     task_id = await asyncio.to_thread(
                                         seedream.create_task,
@@ -2657,6 +2697,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                     task_meta_list.append(
                                         {
                                             "task_id": task_id,
+                                            "generation_id": generation_id,
                                             "background": bg,
                                             "hair": hair_code or "any",
                                             "style": style_code,
@@ -2668,32 +2709,38 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                             "cloth_url": cloth_url,
                                         }
                                     )
+
+                                    # Update generation status to running
+                                    async with db.session() as s:
+                                        gen_db = (
+                                            await s.execute(select(Generation).where(Generation.id == generation_id))
+                                        ).scalar_one_or_none()
+                                        if gen_db:
+                                            gen_db.external_id = task_id
+                                            gen_db.status = GenerationStatus.running
+
                                 except Exception as e:
+                                    # Task creation failed - mark generation as failed and refund credit
+                                    async with db.session() as s:
+                                        gen_db = (
+                                            await s.execute(select(Generation).where(Generation.id == generation_id))
+                                        ).scalar_one_or_none()
+                                        user_db = (
+                                            await s.execute(select(User).where(User.user_id == q.from_user.id))
+                                        ).scalar_one_or_none()
+
+                                        if gen_db:
+                                            gen_db.status = GenerationStatus.failed
+                                            gen_db.error_message = f"Task creation failed: {str(e)}"
+                                            gen_db.finished_at = datetime.now(timezone.utc)
+                                        if user_db and gen_db:
+                                            user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
                                     failed_on_create += 1
                                     logger.exception("Seedream create_task failed (all-mode)", extra={"error": repr(e)})
 
-        # Note: task_meta_list is already built per selected mode above
-
-        # Если вообще не удалось создать ни одной задачи — откатываем генерацию
+        # Check if any tasks were created
         if not task_meta_list:
-            async with db.session() as s:
-                gen_db: Optional[Generation] = (
-                    await s.execute(
-                        select(Generation).where(Generation.id == generation_id)
-                    )
-                ).scalar_one_or_none()
-                user_db: Optional[User] = (
-                    await s.execute(
-                        select(User).where(User.user_id == q.from_user.id)
-                    )
-                ).scalar_one_or_none()
-
-                if gen_db:
-                    gen_db.status = GenerationStatus.failed
-                    gen_db.error_message = "No Seedream tasks created"
-                if user_db and gen_db:
-                    user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
-
             await state.clear()
             err_text = T(lang, "generation_failed")
             try:
@@ -2702,18 +2749,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 await q.message.answer(err_text)
             return
 
-        # --- 9. помечаем Generation как running ---
-        async with db.session() as s:
-            gen_db: Optional[Generation] = (
-                await s.execute(
-                    select(Generation).where(Generation.id == generation_id)
-                )
-            ).scalar_one_or_none()
-            if gen_db:
-                gen_db.external_id = ",".join(m["task_id"] for m in task_meta_list)
-                gen_db.status = GenerationStatus.running
-
-        # --- 10. уведомляем пользователя о постановке задач ---
+        # Notify user about task submission
         first_task_id = task_meta_list[0]["task_id"]
         notify_text = T(lang, "task_queued", task_id=first_task_id)
         try:
@@ -2721,206 +2757,174 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         except Exception:
             await q.message.answer(notify_text)
 
-        # --- 11. ждём результаты всех задач и качаем картинки с ретраями по каждой комбинации ---
-        try:
-            image_records: list[dict[str, Any]] = []
-            failed_combos = 0
+        # --- Process results for all tasks and update individual generation status ---
+        image_records: list[dict[str, Any]] = []
+        failed_combos = 0
 
-            for meta in task_meta_list:
-                combo_success = False
-                last_error: Exception | None = None
+        for meta in task_meta_list:
+            generation_id = meta["generation_id"]
+            combo_success = False
+            last_error: Exception | None = None
 
-                for attempt in range(1, 4):  # до 3 попыток на комбинацию
-                    task_id = meta["task_id"]
-                    try:
-                        task_info = await asyncio.to_thread(
-                            seedream.wait_for_result,
-                            task_id,
-                            poll_interval=5.0,
-                            timeout=180.0,
-                        )
-                        data_info = task_info.get("data", {})
-                        result_json_str = data_info.get("resultJson")
-                        if not result_json_str:
-                            raise RuntimeError(
-                                f"No resultJson in task_info={task_info!r}"
-                            )
-
-                        result_obj = json.loads(result_json_str)
-                        result_urls = result_obj.get("resultUrls") or []
-                        if not result_urls:
-                            raise RuntimeError(
-                                f"No resultUrls in resultJson={result_obj!r}"
-                            )
-
-                        # если дошли сюда — эта комбинация успешно отгенерилась
-                        for url in result_urls:
-                            download_url = await asyncio.to_thread(
-                                seedream.get_download_url, url
-                            )
-                            img_bytes = await asyncio.to_thread(
-                                seedream.download_file_bytes, download_url
-                            )
-                            image_records.append(
-                                {
-                                    "url": url,
-                                    "bytes": img_bytes,
-                                    "background": meta["background"],
-                                    "hair": meta["hair"],
-                                    "style": meta["style"],
-                                    "aspect": meta["aspect"],
-                                }
-                            )
-
-                        combo_success = True
-                        break  # выходим из цикла попыток для этой комбинации
-
-                    except Exception as e:
-                        last_error = e
-                        logger.warning(
-                            "Seedream combo failed (wait/result) "
-                            "— for task {task_id}",
-                            extra={
-                                "task_id": task_id,
-                                "meta": meta,
-                                "error": repr(e),
-                            },
+            for attempt in range(1, 4):  # до 3 попыток на комбинацию
+                task_id = meta["task_id"]
+                try:
+                    task_info = await asyncio.to_thread(
+                        seedream.wait_for_result,
+                        task_id,
+                        poll_interval=5.0,
+                        timeout=180.0,
+                    )
+                    data_info = task_info.get("data", {})
+                    result_json_str = data_info.get("resultJson")
+                    if not result_json_str:
+                        raise RuntimeError(
+                            f"No resultJson in task_info={task_info!r}"
                         )
 
-                        if attempt >= 3:
-                            # исчерпали попытки, выходим, комбо считаем проваленным
-                            break
+                    result_obj = json.loads(result_json_str)
+                    result_urls = result_obj.get("resultUrls") or []
+                    if not result_urls:
+                        raise RuntimeError(
+                            f"No resultUrls in resultJson={result_obj!r}"
+                        )
 
-                        # пробуем создать новый task для этой же комбинации
-                        try:
-                            new_task_id = await asyncio.to_thread(
-                                seedream.create_task,
-                                meta["prompt"],
-                                image_size=meta["image_size"],
-                                image_resolution=meta["image_resolution"],
-                                max_images=meta.get("max_images", num_items),
-                                image_urls=[meta["cloth_url"]],
-                            )
-                            meta["task_id"] = new_task_id
-                        except Exception as e2:
-                            last_error = e2
-                            logger.warning(
-                                "Seedream re-create_task failed for combo retry",
-                                extra={
-                                    "meta": meta,
-                                    "attempt": attempt,
-                                    "error": repr(e2),
-                                },
-                            )
-                            # пойдём на следующую попытку, если она ещё есть
-                            continue
+                    # Success - download images and update generation status
+                    for url in result_urls:
+                        download_url = await asyncio.to_thread(
+                            seedream.get_download_url, url
+                        )
+                        img_bytes = await asyncio.to_thread(
+                            seedream.download_file_bytes, download_url
+                        )
+                        image_records.append(
+                            {
+                                "url": url,
+                                "bytes": img_bytes,
+                                "generation_id": generation_id,
+                                "background": meta["background"],
+                                "hair": meta["hair"],
+                                "style": meta["style"],
+                                "aspect": meta["aspect"],
+                            }
+                        )
 
-                if not combo_success:
-                    failed_combos += 1
-                    logger.error(
-                        "All retries failed for combo",
-                        extra={"meta": meta, "last_error": repr(last_error)},
-                    )
+                    # Update generation status to succeeded
+                    async with db.session() as s:
+                        gen_db = (
+                            await s.execute(select(Generation).where(Generation.id == generation_id))
+                        ).scalar_one_or_none()
+                        if gen_db:
+                            gen_db.status = GenerationStatus.succeeded
+                            gen_db.images_generated = len(result_urls)
+                            gen_db.finished_at = datetime.now(timezone.utc)
 
-        except Exception as e:
-            # неожиданный общий сбой на этапе ожидания/скачивания
-            async with db.session() as s:
-                gen_db: Optional[Generation] = (
-                    await s.execute(
-                        select(Generation).where(Generation.id == generation_id)
-                    )
-                ).scalar_one_or_none()
-                user_db: Optional[User] = (
-                    await s.execute(
-                        select(User).where(User.user_id == q.from_user.id)
-                    )
-                ).scalar_one_or_none()
+                    combo_success = True
+                    break  # выходим из цикла попыток для этой комбинации
 
-                if gen_db:
-                    gen_db.status = GenerationStatus.failed
-                    gen_db.error_message = str(e)
-                if user_db and gen_db:
-                    user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
-
-            await state.clear()
-            err_text = T(lang, "generation_failed")
-            try:
-                await q.message.edit_text(err_text)
-            except Exception:
-                await q.message.answer(err_text)
-            logger.exception(
-                "Seedream wait_for_result/download (multi-combo) failed (global)",
-                exc_info=e,
-            )
-            return
-
-        # --- 12. если ни одной картинки так и не получили — считаем генерацию неуспешной ---
-        if not image_records:
-            async with db.session() as s:
-                gen_db: Optional[Generation] = (
-                    await s.execute(
-                        select(Generation).where(Generation.id == generation_id)
-                    )
-                ).scalar_one_or_none()
-                user_db: Optional[User] = (
-                    await s.execute(
-                        select(User).where(User.user_id == q.from_user.id)
-                    )
-                ).scalar_one_or_none()
-
-                if gen_db:
-                    gen_db.status = GenerationStatus.failed
-                    gen_db.error_message = "All Seedream combos failed"
-                if user_db and gen_db:
-                    user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
-
-            await state.clear()
-            err_text = T(lang, "generation_failed")
-            try:
-                await q.message.edit_text(err_text)
-            except Exception:
-                await q.message.answer(err_text)
-            return
-
-        # --- 13. сохраняем результат в БД ---
-        async with db.session() as s:
-            gen_db: Optional[Generation] = (
-                await s.execute(
-                    select(Generation).where(Generation.id == generation_id)
-                )
-            ).scalar_one_or_none()
-
-            if gen_db:
-                gen_db.status = GenerationStatus.succeeded
-                gen_db.images_generated = len(image_records)
-                gen_db.finished_at = datetime.now(timezone.utc)
-
-                for rec in image_records:
-                    img = GeneratedImage(
-                        generation_id=gen_db.id,
-                        user_id=q.from_user.id,
-                        role=ImageRole.base,
-                        storage_url=rec["url"],
-                        telegram_file_id=None,
-                        width=None,
-                        height=None,
-                        meta={
-                            "scenario": data.get("settings_mode") == "per_item" and "per_item_generation" or "initial_generation",
-                            "upload_type": upload_type,
-                            # значения ниже коррелируют с конкретной комбо
-                            "gender": None,
-                            "age": None,
-                            "background": rec["background"],
-                            "backgrounds": None,
-                            "hair": rec["hair"],
-                            "hair_options": None,
-                            "style": rec["style"],
-                            "style_options": None,
-                            "aspect": rec["aspect"],
-                            "aspects": None,
+                except Exception as e:
+                    last_error = e
+                    logger.warning(
+                        "Seedream combo failed (wait/result) "
+                        "— for task {task_id}",
+                        extra={
+                            "task_id": task_id,
+                            "meta": meta,
+                            "error": repr(e),
                         },
                     )
-                    s.add(img)
+
+                    if attempt >= 3:
+                        # исчерпали попытки, выходим, комбо считаем проваленным
+                        break
+
+                    # пробуем создать новый task для этой же комбинации
+                    try:
+                        new_task_id = await asyncio.to_thread(
+                            seedream.create_task,
+                            meta["prompt"],
+                            image_size=meta["image_size"],
+                            image_resolution=meta["image_resolution"],
+                            max_images=meta.get("max_images", 1),
+                            image_urls=[meta["cloth_url"]],
+                        )
+                        meta["task_id"] = new_task_id
+
+                        # Update generation with new external_id
+                        async with db.session() as s:
+                            gen_db = (
+                                await s.execute(select(Generation).where(Generation.id == generation_id))
+                            ).scalar_one_or_none()
+                            if gen_db:
+                                gen_db.external_id = new_task_id
+
+                    except Exception as e2:
+                        last_error = e2
+                        logger.warning(
+                            "Seedream re-create_task failed for combo retry",
+                            extra={
+                                "meta": meta,
+                                "attempt": attempt,
+                                "error": repr(e2),
+                            },
+                        )
+                        # пойдём на следующую попытку, если она ещё есть
+                        continue
+
+            if not combo_success:
+                # All retries failed - mark generation as failed and refund credit
+                failed_combos += 1
+                logger.error(
+                    "All retries failed for combo",
+                    extra={"meta": meta, "last_error": repr(last_error)},
+                )
+
+                async with db.session() as s:
+                    gen_db = (
+                        await s.execute(select(Generation).where(Generation.id == generation_id))
+                    ).scalar_one_or_none()
+                    user_db = (
+                        await s.execute(select(User).where(User.user_id == q.from_user.id))
+                    ).scalar_one_or_none()
+
+                    if gen_db:
+                        gen_db.status = GenerationStatus.failed
+                        gen_db.error_message = f"All retries failed: {str(last_error)}"
+                        gen_db.finished_at = datetime.now(timezone.utc)
+                    if user_db and gen_db:
+                        user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
+        # Check if we got any images
+        if not image_records:
+            await state.clear()
+            err_text = T(lang, "generation_failed")
+            try:
+                await q.message.edit_text(err_text)
+            except Exception:
+                await q.message.answer(err_text)
+            return
+
+        # Save generated images to database
+        async with db.session() as s:
+            for rec in image_records:
+                img = GeneratedImage(
+                    generation_id=rec["generation_id"],
+                    user_id=q.from_user.id,
+                    role=ImageRole.base,
+                    storage_url=rec["url"],
+                    telegram_file_id=None,
+                    width=None,
+                    height=None,
+                    meta={
+                        "scenario": data.get("settings_mode") == "per_item" and "per_item_generation" or "initial_generation",
+                        "upload_type": upload_type,
+                        "background": rec["background"],
+                        "hair": rec["hair"],
+                        "style": rec["style"],
+                        "aspect": rec["aspect"],
+                    },
+                )
+                s.add(img)
 
         # --- 14. отправляем пользователю все картинки и связываем с telegram_file_id ---
         from aiogram.types import BufferedInputFile
@@ -2945,7 +2949,6 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 img_db: Optional[GeneratedImage] = (
                     await s.execute(
                         select(GeneratedImage).where(
-                            GeneratedImage.generation_id == generation_id,
                             GeneratedImage.user_id == q.from_user.id,
                             GeneratedImage.storage_url == url,
                         )
