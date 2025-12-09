@@ -31,7 +31,9 @@ GEN_SCENARIO_PRICES: dict[str, int] = {
     "upper_body": 1,
     "lower_body": 1,
 }
-
+HAIR_KEYS = ("any", "dark", "light")
+STYLE_KEYS = ("strict", "luxury", "casual", "sport")
+ASPECT_KEYS = ("3_4", "9_16", "1_1", "16_9")
 BG_KEYS = ("white", "beige", "pink", "black")
 
 # --- локальные маппинги под конструктор промпта ---

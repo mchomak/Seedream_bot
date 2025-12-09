@@ -21,7 +21,7 @@ from aiogram.types import (
 from loguru import logger
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from fsm import AnyInput
 from db import (
     Database,
     User,
@@ -393,6 +393,151 @@ def build_background_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMa
     )
 
 
+def build_hair_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
+    """
+    Клавиатура мультивыбора цвета волос с галочками.
+    """
+    def btn_text(key: str, phrase_key: str) -> str:
+        base = T(lang, phrase_key)
+        return f"✅ {base}" if key in selected else base
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=btn_text("any", "btn_hair_any"),
+                    callback_data="gen:hair:any",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("dark", "btn_hair_dark"),
+                    callback_data="gen:hair:dark",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("light", "btn_hair_light"),
+                    callback_data="gen:hair:light",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_next"),
+                    callback_data="gen:hair:next",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_back"),
+                    callback_data="gen:back_to_gender",
+                )
+            ],
+        ]
+    )
+
+
+def build_style_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
+    """
+    Клавиатура мультивыбора стиля фото.
+    """
+    def btn_text(key: str, phrase_key: str) -> str:
+        base = T(lang, phrase_key)
+        return f"✅ {base}" if key in selected else base
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=btn_text("strict", "btn_style_strict"),
+                    callback_data="gen:style:strict",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("luxury", "btn_style_luxury"),
+                    callback_data="gen:style:luxury",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("casual", "btn_style_casual"),
+                    callback_data="gen:style:casual",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("sport", "btn_style_sport"),
+                    callback_data="gen:style:sport",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_next"),
+                    callback_data="gen:style:next",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_back"),
+                    callback_data="gen:back_to_age",
+                )
+            ],
+        ]
+    )
+
+
+def build_aspect_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
+    """
+    Клавиатура мультивыбора соотношения сторон.
+    """
+    def btn_text(key: str, phrase_key: str) -> str:
+        base = T(lang, phrase_key)
+        return f"✅ {base}" if key in selected else base
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=btn_text("3_4", "btn_aspect_3_4"),
+                    callback_data="gen:aspect:3_4",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("9_16", "btn_aspect_9_16"),
+                    callback_data="gen:aspect:9_16",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("1_1", "btn_aspect_1_1"),
+                    callback_data="gen:aspect:1_1",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=btn_text("16_9", "btn_aspect_16_9"),
+                    callback_data="gen:aspect:16_9",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_next"),
+                    callback_data="gen:aspect:next",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=T(lang, "btn_back"),
+                    callback_data="gen:back_to_style",
+                )
+            ],
+        ]
+    )
+
+
+
 # ---------- core router ----------
 def build_router(db: Database, seedream: SeedreamService) -> Router:
     """
@@ -504,6 +649,73 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     async def cmd_switch_lang(m: Message):
         lang = await get_lang(m, db)
         await m.answer(T(lang, "choose_lang_title"), reply_markup=_build_lang_kb())
+
+
+    @r.callback_query(F.data.startswith("gen:mode:"))
+    async def on_gen_mode_select(query: CallbackQuery, state: FSMContext):
+        """
+        Пользователь выбрал сценарий:
+        - gen:mode:all      -> единые настройки для всех вещей
+        - gen:mode:per_item -> отдельные настройки для каждой вещи (пока заглушка)
+        """
+        from fsm import GenerationFlow
+
+        lang = await get_lang(query, db)
+        data = await state.get_data()
+
+        mode = query.data.split(":", maxsplit=2)[-1]
+        cloth_file_ids = list(data.get("cloth_file_ids") or [])
+        num_items = len(cloth_file_ids) or 1
+
+        if not cloth_file_ids:
+            await query.answer(
+                T(lang, "no_items_yet") or "Вы ещё не загрузили ни одной вещи.",
+                show_alert=True,
+            )
+            return
+
+        if mode == "per_item":
+            # пока не реализуем детальный сценарий, честно говорим
+            await state.update_data(settings_mode="per_item")
+            await query.answer(
+                T(lang, "per_item_mode_not_ready")
+                or "Режим с отдельными настройками для каждой вещи пока не реализован. Используйте единые настройки.",
+                show_alert=True,
+            )
+            return
+
+        if mode == "all":
+            await state.update_data(settings_mode="all", num_items=num_items)
+
+            intro_text = T(lang, "settings_intro_single", count=num_items)
+            base_text = T(lang, "background_select_single")
+            full_text = f"{intro_text}\n\n{base_text}"
+
+            # стартуем с пустого набора выбранных фонов
+            selected_backgrounds: set[str] = set(data.get("backgrounds") or [])
+            kb = build_background_keyboard(lang, selected_backgrounds)
+
+            await query.answer()
+
+            try:
+                await query.message.edit_text(full_text, reply_markup=kb)
+                msg_id = query.message.message_id
+                chat_id = query.message.chat.id
+            except Exception:
+                sent = await query.message.answer(full_text, reply_markup=kb)
+                msg_id = sent.message_id
+                chat_id = sent.chat.id
+
+            await state.update_data(
+                generate_prompt_msg_id=msg_id,
+                generate_chat_id=chat_id,
+                backgrounds=list(selected_backgrounds),
+            )
+            await state.set_state(GenerationFlow.choosing_background)
+            return
+
+        await query.answer()
+
 
     @r.callback_query(F.data.startswith("set_lang:"))
     async def on_set_lang(q: CallbackQuery, bot: Bot):
@@ -819,72 +1031,98 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
     # --- Обработчик изображения-документа в рамках генерации ---
     @r.message(F.document)
-    async def on_document_for_generation(m: Message, state: FSMContext):
+    async def on_document_for_generation(message: Message, state: FSMContext):
         """
-        Принимаем 1 фото одежды в виде документа.
-        Сценарий >1 фото пока заглушка.
-        После первого валидного документа сразу переходим к выбору фона.
+        Пользователь присылает фото одежды (как документ) в сценарии генерации.
+        Поддерживаем 1..N вещей:
+        - накапливаем список cloth_file_ids
+        - после каждой загрузки показываем/обновляем сообщение
+          'Вы загрузили N вещей. Что вам удобнее?' с двумя сценариями.
         """
         from fsm import GenerationFlow
 
+        # Реагируем только когда реально ждём документ в GenerationFlow
         current_state = await state.get_state()
         if current_state != GenerationFlow.waiting_document.state:
-            # Документ пришёл не в контексте генерации
             return
 
-        lang = await get_lang(m, db)
+        lang = await get_lang(message, db)
+
+        doc = message.document
+        if not doc or not doc.mime_type or not doc.mime_type.startswith("image/"):
+            await message.answer(T(lang, "only_image_documents"))
+            return
+
         data = await state.get_data()
+        cloth_file_ids = list(data.get("cloth_file_ids") or [])
+        cloth_file_ids.append(doc.file_id)
+        num_items = len(cloth_file_ids)
 
-        # Заглушка на сценарий с несколькими фото
-        num_items = int(data.get("num_items") or 0)
-        if num_items >= 1:
-            await m.answer(T(lang, "multi_items_not_supported"))
-            return
-
-        doc = m.document
-        mime = (doc.mime_type or "").lower()
-        logger.info(
-            "Incoming document from %s: mime=%s, file_id=%s",
-            m.from_user.id,
-            mime,
-            doc.file_id,
-        )
-
-        if not mime.startswith("image/"):
-            await m.answer(T(lang, "upload_doc_wrong_type"))
-            return
-
-        # Сохраняем в стейт только file_id – байты докачаем перед генерацией
-        upload_type = data.get("upload_type") or "flat"
         await state.update_data(
-            cloth_file_ids=[doc.file_id],
-            num_items=1,
-            upload_type=upload_type,
-            backgrounds=[],
-            gender=None,
-            hair_color=None,
-            age=None,
-            style=None,
-            aspect_ratios=[],
+            cloth_file_ids=cloth_file_ids,
+            num_items=num_items,
         )
 
-        # Формируем текст шага про фон
-        intro_text = T(lang, "settings_intro_single", count=1)
-        bg_text = T(lang, "background_select_single")
-
-        full_text = intro_text + "\n\n" + bg_text
-
-        # Показываем выбор фона НОВЫМ сообщением
-        kb = build_background_keyboard(lang, selected=set())
-        sent = await m.answer(full_text, reply_markup=kb)
-
-        # Обновляем "рабочее" сообщение для дальнейших редактирований
-        await state.update_data(
-            generate_prompt_msg_id=sent.message_id,
-            generate_chat_id=sent.chat.id,
+        # Текст для выбора режима
+        text = T(
+            lang,
+            "multi_items_intro",
+            count=num_items,
+        ) or (
+            f"Вы загрузили {num_items} вещей. Далее вы сможете выбрать фон, пол, возраст и цвет волос модели, "
+            f"соотношение сторон и стиль фото на выходе.\n\nЧто вам удобнее?"
         )
 
-        await state.set_state(GenerationFlow.choosing_background)
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_mode_all_items")
+                        or "Задать единые настройки для всех вещей (быстрее)",
+                        callback_data="gen:mode:all",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_mode_per_item")
+                        or "Задать настройки для каждой вещи отдельно",
+                        callback_data="gen:mode:per_item",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_back_to_start") or "Назад",
+                        callback_data="gen:back_to_start",
+                    )
+                ],
+            ]
+        )
+
+        # Если уже показывали сообщение про количество вещей — редактируем его,
+        # иначе отправляем новое.
+        items_msg_id = data.get("items_mode_msg_id")
+        items_chat_id = data.get("items_mode_chat_id")
+
+        if items_msg_id and items_chat_id:
+            try:
+                await message.bot.edit_message_text(
+                    chat_id=items_chat_id,
+                    message_id=items_msg_id,
+                    text=text,
+                    reply_markup=kb,
+                )
+            except Exception:
+                sent = await message.answer(text, reply_markup=kb)
+                await state.update_data(
+                    items_mode_msg_id=sent.message_id,
+                    items_mode_chat_id=sent.chat.id,
+                )
+        else:
+            sent = await message.answer(text, reply_markup=kb)
+            await state.update_data(
+                items_mode_msg_id=sent.message_id,
+                items_mode_chat_id=sent.chat.id,
+            )
 
 
     @r.callback_query(F.data == "gen:back_to_background")
@@ -924,6 +1162,59 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             await q.message.edit_caption(full_text, reply_markup=kb)
 
         await state.set_state(GenerationFlow.choosing_background)
+        await q.answer()
+
+
+    @r.callback_query(F.data == "gen:back_to_gender")
+    async def on_gen_back_to_gender(q: CallbackQuery, state: FSMContext):
+        """
+        Возврат со шага выбора волос назад к выбору пола.
+        """
+        from fsm import GenerationFlow
+
+        lang = await get_lang(q, db)
+        data = await state.get_data()
+        gender = data.get("gender") or "female"
+
+        def btn_text(code: str, phrase_key: str) -> str:
+            base = T(lang, phrase_key)
+            return f"✅ {base}" if code == gender else base
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=btn_text("female", "btn_gender_female"),
+                        callback_data="gen:gender:female",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=btn_text("male", "btn_gender_male"),
+                        callback_data="gen:gender:male",
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_back"),
+                        callback_data="gen:back_to_background",
+                    )
+                ],
+            ]
+        )
+
+        try:
+            await q.message.edit_text(
+                T(lang, "gender_choose_title"),
+                reply_markup=kb,
+            )
+        except Exception:
+            await q.message.answer(
+                T(lang, "gender_choose_title"),
+                reply_markup=kb,
+            )
+
+        await state.set_state(GenerationFlow.choosing_gender)
         await q.answer()
 
 
@@ -1045,7 +1336,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         """
         Выбор пола модели:
         - сохраняем gender
-        - показываем шаг выбора цвета волос (один вариант из трёх)
+        - показываем шаг выбора цвета волос (мультивыбор)
         """
         from fsm import GenerationFlow
 
@@ -1060,40 +1351,14 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             await q.answer()
             return
 
-        # Сохраняем пол модели в стейт
         await state.update_data(gender=gender)
 
-        # Клавиатура выбора цвета волос (один вариант)
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_hair_any"),
-                        callback_data="gen:hair:any",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_hair_dark"),
-                        callback_data="gen:hair:dark",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_hair_light"),
-                        callback_data="gen:hair:light",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_back"),
-                        callback_data="gen:back_to_background",
-                    )
-                ],
-            ]
-        )
+        data = await state.get_data()
+        # по умолчанию считаем, что выбран вариант "Любой"
+        selected_hairs = set(data.get("hair_options") or {"any"})
 
-        # Показываем следующий шаг (выбор волос)
+        kb = build_hair_keyboard(lang, selected_hairs)
+
         try:
             await q.message.edit_text(
                 T(lang, "settings_hair_title"),
@@ -1109,8 +1374,48 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         await q.answer()
 
 
+    @r.callback_query(F.data == "gen:back_to_hair")
+    async def on_gen_back_to_hair(q: CallbackQuery, state: FSMContext):
+        """
+        Возврат со шага возраста к выбору цвета волос (с сохранённым выбором).
+        """
+        from fsm import GenerationFlow
+
+        lang = await get_lang(q, db)
+        data = await state.get_data()
+        selected = set(data.get("hair_options") or {"any"})
+
+        kb = build_hair_keyboard(lang, selected)
+
+        # текст + список выбранных цветов
+        if lang == "ru":
+            labels = [HAIR_LABELS[h][0] for h in selected if h in HAIR_LABELS]
+        else:
+            labels = [HAIR_LABELS[h][1] for h in selected if h in HAIR_LABELS]
+
+        base_text = T(lang, "settings_hair_title")
+        if labels:
+            selected_block = T(lang, "hair_selected_header") + "\n" + "\n".join(labels)
+            full_text = base_text + "\n\n" + selected_block
+        else:
+            full_text = base_text
+
+        try:
+            await q.message.edit_text(full_text, reply_markup=kb)
+        except Exception:
+            await q.message.answer(full_text, reply_markup=kb)
+
+        await state.set_state(GenerationFlow.choosing_hair)
+        await q.answer()
+
+
     @r.callback_query(F.data.startswith("gen:hair:"))
     async def on_gen_choose_hair(q: CallbackQuery, state: FSMContext):
+        """
+        Мультивыбор цвета волос:
+        - gen:hair:any|dark|light — тогаем выбранность
+        - gen:hair:next          — фиксируем выбор и переходим к возрасту
+        """
         from fsm import GenerationFlow
 
         current = await state.get_state()
@@ -1119,60 +1424,123 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             return
 
         lang = await get_lang(q, db)
-        _, _, hair = q.data.partition("gen:hair:")
-        if hair not in ("any", "dark", "light"):
+        data = await state.get_data()
+        action = q.data.split(":", 2)[-1]
+
+        selected = set(data.get("hair_options") or set())
+
+        # --- тогаем чекбоксы ---
+        if action in HAIR_KEYS:
+            if action == "any":
+                # "Любой" взаимоисключающий — сбрасываем остальные
+                if "any" in selected:
+                    selected.remove("any")
+                else:
+                    selected = {"any"}
+            else:
+                if action in selected:
+                    selected.remove(action)
+                else:
+                    selected.add(action)
+                # если выбрали конкретный цвет — убираем "any"
+                if "any" in selected and len(selected) > 1:
+                    selected.remove("any")
+
+            await state.update_data(hair_options=list(selected))
+
+            # перерисовываем клавиатуру и текст
+            if lang == "ru":
+                labels = [HAIR_LABELS[h][0] for h in selected if h in HAIR_LABELS]
+            else:
+                labels = [HAIR_LABELS[h][1] for h in selected if h in HAIR_LABELS]
+
+            base_text = T(lang, "settings_hair_title")
+            if labels:
+                selected_block = T(lang, "hair_selected_header") + "\n" + "\n".join(labels)
+                full_text = base_text + "\n\n" + selected_block
+            else:
+                full_text = base_text
+
+            kb = build_hair_keyboard(lang, selected)
+
+            try:
+                await q.message.edit_text(full_text, reply_markup=kb)
+            except Exception:
+                await q.message.edit_caption(full_text, reply_markup=kb)
+
             await q.answer()
             return
 
-        await state.update_data(hair=hair)
+        # --- Next: валидируем и идём к возрасту ---
+        if action == "next":
+            if not selected:
+                await q.answer(T(lang, "hair_need_one"), show_alert=True)
+                return
 
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_age_young"),
-                        callback_data="gen:age:young",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_age_senior"),
-                        callback_data="gen:age:senior",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_age_child"),
-                        callback_data="gen:age:child",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_age_teen"),
-                        callback_data="gen:age:teen",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_back"),
-                        callback_data="gen:gender:female",  # формальный "back", упростим
-                    )
-                ],
-            ]
-        )
+            # effective список для логики:
+            if selected == {"any"}:
+                hair_main = "any"
+                hair_options = ["any"]
+            else:
+                hair_options = [h for h in HAIR_KEYS if h in selected and h != "any"]
+                hair_main = hair_options[0] if hair_options else "any"
 
-        try:
-            await q.message.edit_text(
-                T(lang, "settings_age_title"),
-                reply_markup=kb,
-            )
-        except Exception:
-            await q.message.answer(
-                T(lang, "settings_age_title"),
-                reply_markup=kb,
+            await state.update_data(
+                hair=hair_main,
+                hair_options=hair_options,
             )
 
-        await state.set_state(GenerationFlow.choosing_age)
+            # показываем выбор возраста
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_age_young"),
+                            callback_data="gen:age:young",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_age_senior"),
+                            callback_data="gen:age:senior",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_age_child"),
+                            callback_data="gen:age:child",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_age_teen"),
+                            callback_data="gen:age:teen",
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_back"),
+                            callback_data="gen:back_to_hair",
+                        )
+                    ],
+                ]
+            )
+
+            try:
+                await q.message.edit_text(
+                    T(lang, "settings_age_title"),
+                    reply_markup=kb,
+                )
+            except Exception:
+                await q.message.answer(
+                    T(lang, "settings_age_title"),
+                    reply_markup=kb,
+                )
+
+            await state.set_state(GenerationFlow.choosing_age)
+            await q.answer()
+            return
+
         await q.answer()
 
 
@@ -1193,36 +1561,78 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         await state.update_data(age=age)
 
+        data = await state.get_data()
+        selected_styles = set(data.get("style_options") or set())
+
+        kb = build_style_keyboard(lang, selected_styles)
+
+        # базовый текст + выбранные стили (если есть)
+        if lang == "ru":
+            labels = [STYLE_LABELS[s][0] for s in selected_styles if s in STYLE_LABELS]
+        else:
+            labels = [STYLE_LABELS[s][1] for s in selected_styles if s in STYLE_LABELS]
+
+        base_text = T(lang, "settings_style_title")
+        if labels:
+            selected_block = T(lang, "style_selected_header") + "\n" + "\n".join(labels)
+            full_text = base_text + "\n\n" + selected_block
+        else:
+            full_text = base_text
+
+        try:
+            await q.message.edit_text(full_text, reply_markup=kb)
+        except Exception:
+            await q.message.answer(full_text, reply_markup=kb)
+
+        await state.set_state(GenerationFlow.choosing_style)
+        await q.answer()
+
+
+    @r.callback_query(F.data == "gen:back_to_age")
+    async def on_gen_back_to_age(q: CallbackQuery, state: FSMContext):
+        """
+        Возврат со шага стиля к выбору возраста.
+        """
+        from fsm import GenerationFlow
+
+        lang = await get_lang(q, db)
+        data = await state.get_data()
+        age = data.get("age") or "young"
+
+        def btn_text(code: str, phrase_key: str) -> str:
+            base = T(lang, phrase_key)
+            return f"✅ {base}" if code == age else base
+
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text=T(lang, "btn_style_strict"),
-                        callback_data="gen:style:strict",
+                        text=btn_text("young", "btn_age_young"),
+                        callback_data="gen:age:young",
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        text=T(lang, "btn_style_luxury"),
-                        callback_data="gen:style:luxury",
+                        text=btn_text("senior", "btn_age_senior"),
+                        callback_data="gen:age:senior",
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        text=T(lang, "btn_style_casual"),
-                        callback_data="gen:style:casual",
+                        text=btn_text("child", "btn_age_child"),
+                        callback_data="gen:age:child",
                     )
                 ],
                 [
                     InlineKeyboardButton(
-                        text=T(lang, "btn_style_sport"),
-                        callback_data="gen:style:sport",
+                        text=btn_text("teen", "btn_age_teen"),
+                        callback_data="gen:age:teen",
                     )
                 ],
                 [
                     InlineKeyboardButton(
                         text=T(lang, "btn_back"),
-                        callback_data="gen:hair:any",
+                        callback_data="gen:back_to_hair",
                     )
                 ],
             ]
@@ -1230,14 +1640,48 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         try:
             await q.message.edit_text(
-                T(lang, "settings_style_title"),
+                T(lang, "settings_age_title"),
                 reply_markup=kb,
             )
         except Exception:
             await q.message.answer(
-                T(lang, "settings_style_title"),
+                T(lang, "settings_age_title"),
                 reply_markup=kb,
             )
+
+        await state.set_state(GenerationFlow.choosing_age)
+        await q.answer()
+
+
+    @r.callback_query(F.data == "gen:back_to_style")
+    async def on_gen_back_to_style(q: CallbackQuery, state: FSMContext):
+        """
+        Возврат со шага аспектов к выбору стиля.
+        """
+        from fsm import GenerationFlow
+
+        lang = await get_lang(q, db)
+        data = await state.get_data()
+        selected = set(data.get("style_options") or set())
+
+        kb = build_style_keyboard(lang, selected)
+
+        if lang == "ru":
+            labels = [STYLE_LABELS[s][0] for s in selected if s in STYLE_LABELS]
+        else:
+            labels = [STYLE_LABELS[s][1] for s in selected if s in STYLE_LABELS]
+
+        base_text = T(lang, "settings_style_title")
+        if labels:
+            selected_block = T(lang, "style_selected_header") + "\n" + "\n".join(labels)
+            full_text = base_text + "\n\n" + selected_block
+        else:
+            full_text = base_text
+
+        try:
+            await q.message.edit_text(full_text, reply_markup=kb)
+        except Exception:
+            await q.message.answer(full_text, reply_markup=kb)
 
         await state.set_state(GenerationFlow.choosing_style)
         await q.answer()
@@ -1245,6 +1689,11 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
     @r.callback_query(F.data.startswith("gen:style:"))
     async def on_gen_choose_style(q: CallbackQuery, state: FSMContext):
+        """
+        Мультивыбор стиля:
+        - gen:style:strict|luxury|casual|sport — тогаем
+        - gen:style:next                      — фиксируем и переходим к аспектам
+        """
         from fsm import GenerationFlow
 
         current = await state.get_state()
@@ -1253,60 +1702,79 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             return
 
         lang = await get_lang(q, db)
-        _, _, style = q.data.partition("gen:style:")
-        if style not in ("strict", "luxury", "casual", "sport"):
+        action = q.data.split(":", 2)[-1]
+        data = await state.get_data()
+        selected = set(data.get("style_options") or set())
+
+        if action in STYLE_KEYS:
+            if action in selected:
+                selected.remove(action)
+            else:
+                selected.add(action)
+
+            await state.update_data(style_options=list(selected))
+
+            if lang == "ru":
+                labels = [STYLE_LABELS[s][0] for s in selected if s in STYLE_LABELS]
+            else:
+                labels = [STYLE_LABELS[s][1] for s in selected if s in STYLE_LABELS]
+
+            base_text = T(lang, "settings_style_title")
+            if labels:
+                selected_block = T(lang, "style_selected_header") + "\n" + "\n".join(labels)
+                full_text = base_text + "\n\n" + selected_block
+            else:
+                full_text = base_text
+
+            kb = build_style_keyboard(lang, selected)
+
+            try:
+                await q.message.edit_text(full_text, reply_markup=kb)
+            except Exception:
+                await q.message.edit_caption(full_text, reply_markup=kb)
+
             await q.answer()
             return
 
-        await state.update_data(style=style)
+        if action == "next":
+            if not selected:
+                await q.answer(T(lang, "style_need_one"), show_alert=True)
+                return
 
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_aspect_3_4"),
-                        callback_data="gen:aspect:3_4",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_aspect_9_16"),
-                        callback_data="gen:aspect:9_16",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_aspect_1_1"),
-                        callback_data="gen:aspect:1_1",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_aspect_16_9"),
-                        callback_data="gen:aspect:16_9",
-                    )
-                ],
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_back"),
-                        callback_data="gen:age:young",
-                    )
-                ],
-            ]
-        )
+            style_options = [s for s in STYLE_KEYS if s in selected]
+            style_main = style_options[0]
 
-        try:
-            await q.message.edit_text(
-                T(lang, "settings_aspect_title"),
-                reply_markup=kb,
-            )
-        except Exception:
-            await q.message.answer(
-                T(lang, "settings_aspect_title"),
-                reply_markup=kb,
+            await state.update_data(
+                style=style_main,
+                style_options=style_options,
             )
 
-        await state.set_state(GenerationFlow.choosing_aspect)
+            # переходим к выбору аспектов
+            aspects_selected = set(data.get("aspects") or set())
+            kb = build_aspect_keyboard(lang, aspects_selected)
+
+            if lang == "ru":
+                labels = [ASPECT_LABELS[a][0] for a in aspects_selected if a in ASPECT_LABELS]
+            else:
+                labels = [ASPECT_LABELS[a][1] for a in aspects_selected if a in ASPECT_LABELS]
+
+            base_text = T(lang, "settings_aspect_title")
+            if labels:
+                selected_block = T(lang, "aspect_selected_header") + "\n" + "\n".join(labels)
+                full_text = base_text + "\n\n" + selected_block
+            else:
+                full_text = base_text
+
+            try:
+                await q.message.edit_text(full_text, reply_markup=kb)
+            except Exception:
+                await q.message.answer(full_text, reply_markup=kb)
+
+            from fsm import GenerationFlow
+            await state.set_state(GenerationFlow.choosing_aspect)
+            await q.answer()
+            return
+
         await q.answer()
 
 
@@ -1320,109 +1788,201 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             return
 
         lang = await get_lang(q, db)
-        _, _, aspect = q.data.partition("gen:aspect:")
-        if aspect not in ("3_4", "9_16", "1_1", "16_9"):
+        action = q.data.split(":", 2)[-1]
+        data = await state.get_data()
+
+        selected = set(data.get("aspects") or set())
+
+        # --- тогаем чекбоксы ---
+        if action in ASPECT_KEYS:
+            if action in selected:
+                selected.remove(action)
+            else:
+                selected.add(action)
+
+            await state.update_data(aspects=list(selected))
+
+            if lang == "ru":
+                labels = [ASPECT_LABELS[a][0] for a in selected if a in ASPECT_LABELS]
+            else:
+                labels = [ASPECT_LABELS[a][1] for a in selected if a in ASPECT_LABELS]
+
+            base_text = T(lang, "settings_aspect_title")
+            if labels:
+                selected_block = T(lang, "aspect_selected_header") + "\n" + "\n".join(labels)
+                full_text = base_text + "\n\n" + selected_block
+            else:
+                full_text = base_text
+
+            kb = build_aspect_keyboard(lang, selected)
+
+            try:
+                await q.message.edit_text(full_text, reply_markup=kb)
+            except Exception:
+                await q.message.edit_caption(full_text, reply_markup=kb)
+
             await q.answer()
             return
 
-        await state.update_data(aspect=aspect)
+        # --- Next: считаем комбинаторику и рисуем summary ---
+        if action == "next":
+            if not selected:
+                await q.answer(T(lang, "aspect_need_one"), show_alert=True)
+                return
 
-        # --- формируем summary ---
-        data = await state.get_data()
-        num_items = int(data.get("num_items") or 1)
+            aspects = [a for a in ASPECT_KEYS if a in selected]
+            aspect_main = aspects[0]
+            await state.update_data(aspect=aspect_main, aspects=aspects)
 
-        # основной ключ фона (первый выбранный, если почему-то нет списка)
-        bg_key = data.get("background") or "white"
-        backgrounds = data.get("backgrounds") or [bg_key]
-        backgrounds = list(dict.fromkeys(backgrounds))  # на всякий случай убираем дубли
+            data = await state.get_data()
+            num_items = int(data.get("num_items") or 1)
 
-        gender = data.get("gender") or "female"
-        hair = data.get("hair") or "any"
-        age = data.get("age") or "young"
-        style = data.get("style") or "casual"
+            # фоны
+            bg_key = data.get("background") or "white"
+            backgrounds = data.get("backgrounds") or [bg_key]
+            backgrounds = list(dict.fromkeys(backgrounds))
 
-        # читаемые подписи
-        if lang == "ru":
-            bg_labels = [BG_LABELS[k][0] for k in backgrounds if k in BG_LABELS]
-            gender_label = GENDER_LABELS[gender][0]
-            hair_label = HAIR_LABELS[hair][0]
-            age_label = AGE_LABELS[age][0]
-            style_label = STYLE_LABELS[style][0]
-            aspect_label = ASPECT_LABELS[aspect][0]
-        else:
-            bg_labels = [BG_LABELS[k][1] for k in backgrounds if k in BG_LABELS]
-            gender_label = GENDER_LABELS[gender][1]
-            hair_label = HAIR_LABELS[hair][1]
-            age_label = AGE_LABELS[age][1]
-            style_label = STYLE_LABELS[style][1]
-            aspect_label = ASPECT_LABELS[aspect][1]
+            # волосы
+            hair_main = data.get("hair") or "any"
+            hair_options = data.get("hair_options") or [hair_main]
+            if not hair_options:
+                hair_options = ["any"]
 
-        # строка с фонами через запятую
-        background_str = ", ".join(bg_labels) if bg_labels else "-"
+            # стиль
+            style_main = data.get("style") or "casual"
+            style_options = data.get("style_options") or [style_main]
+            style_options = list(dict.fromkeys(style_options))
 
-        # читаем баланс
-        async with db.session() as s:
-            prof = await get_profile(s, tg_user_id=q.from_user.id)
-            balance = prof.credits_balance
+            # аспект уже есть в aspects
 
-        # считаем количество фото:
-        # 1 вещь × N фонов (остальные параметры пока по одному)
-        photos = num_items * max(len(backgrounds), 1)
+            # читаемые подписи
+            if lang == "ru":
+                bg_labels = [BG_LABELS[k][0] for k in backgrounds if k in BG_LABELS]
+                hair_labels = [HAIR_LABELS[h][0] for h in hair_options if h in HAIR_LABELS]
+                style_labels = [STYLE_LABELS[s][0] for s in style_options if s in STYLE_LABELS]
+                aspect_labels = [ASPECT_LABELS[a][0] for a in aspects if a in ASPECT_LABELS]
+            else:
+                bg_labels = [BG_LABELS[k][1] for k in backgrounds if k in BG_LABELS]
+                hair_labels = [HAIR_LABELS[h][1] for h in hair_options if h in HAIR_LABELS]
+                style_labels = [STYLE_LABELS[s][1] for s in style_options if s in STYLE_LABELS]
+                aspect_labels = [ASPECT_LABELS[a][1] for a in aspects if a in ASPECT_LABELS]
 
-        base_text = T(
-            lang,
-            "confirm_generation_title",
-            items=num_items,
-            background=background_str,
-            gender=gender_label,
-            hair=hair_label,
-            age=age_label,
-            style=style_label,
-            aspect=aspect_label,
-            balance=balance,
-            photos=photos,
-        )
+            background_str = ", ".join(bg_labels) if bg_labels else "-"
+            hair_str = ", ".join(hair_labels) if hair_labels else "-"
+            style_str = ", ".join(style_labels) if style_labels else "-"
+            aspect_str = ", ".join(aspect_labels) if aspect_labels else "-"
 
-        extra_text = (
-            "\n\n" + T(lang, "confirm_generation_ok")
-            if balance >= photos
-            else "\n\n" + T(lang, "confirm_generation_not_enough")
-        )
+            # комбинаторика
+            bg_count = max(len(backgrounds), 1)
+            if hair_options == ["any"]:
+                hair_count = 1
+            else:
+                hair_count = len(hair_options)
+            style_count = max(len(style_options), 1)
+            aspect_count = max(len(aspects), 1)
 
-        kb_buttons = [
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_confirm_next"),
-                    callback_data="gen:confirm:next",
-                )
+            photos = num_items * bg_count * hair_count * style_count * aspect_count
+
+            # профиль и баланс
+            async with db.session() as s:
+                prof = await get_profile(s, tg_user_id=q.from_user.id)
+                balance = prof.credits_balance
+
+            base_text = T(
+                lang,
+                "confirm_generation_title",
+                items=num_items,
+                background=background_str,
+                gender=(
+                    GENDER_LABELS[data.get("gender") or "female"][0 if lang == "ru" else 1]
+                ),
+                hair=hair_str,
+                age=(
+                    AGE_LABELS[data.get("age") or "young"][0 if lang == "ru" else 1]
+                ),
+                style=style_str,
+                aspect=aspect_str,
+                balance=balance,
+                photos=photos,
+            )
+
+            extra_text = (
+                "\n\n" + T(lang, "confirm_generation_ok")
+                if balance >= photos
+                else "\n\n" + T(lang, "confirm_generation_not_enough")
+            )
+
+            kb_buttons = [
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_confirm_next"),
+                        callback_data="gen:confirm:next",
+                    )
+                ]
             ]
-        ]
-        if balance < photos:
+            if balance < photos:
+                kb_buttons.append(
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_confirm_topup"),
+                            callback_data="gen:confirm:topup",
+                        )
+                    ]
+                )
             kb_buttons.append(
                 [
                     InlineKeyboardButton(
-                        text=T(lang, "btn_confirm_topup"),
-                        callback_data="gen:confirm:topup",
+                        text=T(lang, "btn_back"),
+                        callback_data="gen:aspect_back",
                     )
                 ]
             )
-        kb_buttons.append(
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_back"),
-                    callback_data="gen:aspect_back",
-                )
-            ]
-        )
 
-        kb = InlineKeyboardMarkup(inline_keyboard=kb_buttons)
+            kb = InlineKeyboardMarkup(inline_keyboard=kb_buttons)
+
+            try:
+                await q.message.edit_text(base_text + extra_text, reply_markup=kb)
+            except Exception:
+                await q.message.answer(base_text + extra_text, reply_markup=kb)
+
+            await state.set_state(GenerationFlow.confirming)
+            await q.answer()
+            return
+
+        await q.answer()
+
+
+    @r.callback_query(F.data == "gen:aspect_back")
+    async def on_gen_aspect_back(q: CallbackQuery, state: FSMContext):
+        """
+        Из экрана подтверждения (summary) назад к выбору соотношения сторон.
+        """
+        from fsm import GenerationFlow
+
+        lang = await get_lang(q, db)
+        data = await state.get_data()
+        selected = set(data.get("aspects") or set())
+
+        kb = build_aspect_keyboard(lang, selected)
+
+        if lang == "ru":
+            labels = [ASPECT_LABELS[a][0] for a in selected if a in ASPECT_LABELS]
+        else:
+            labels = [ASPECT_LABELS[a][1] for a in selected if a in ASPECT_LABELS]
+
+        base_text = T(lang, "settings_aspect_title")
+        if labels:
+            selected_block = T(lang, "aspect_selected_header") + "\n" + "\n".join(labels)
+            full_text = base_text + "\n\n" + selected_block
+        else:
+            full_text = base_text
 
         try:
-            await q.message.edit_text(base_text + extra_text, reply_markup=kb)
+            await q.message.edit_text(full_text, reply_markup=kb)
         except Exception:
-            await q.message.answer(base_text + extra_text, reply_markup=kb)
+            await q.message.answer(full_text, reply_markup=kb)
 
-        await state.set_state(GenerationFlow.confirming)
+        await state.set_state(GenerationFlow.choosing_aspect)
         await q.answer()
 
 
@@ -1430,12 +1990,10 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     async def on_gen_confirm(q: CallbackQuery, state: FSMContext, bot: Bot):
         """
         Подтверждение генерации:
-        - проверяем действие (далее / пополнить)
-        - скачиваем фото одежды из Telegram
-        - загружаем в Seedream (получаем cloth_url)
-        - собираем промпты из выбранных параметров (по одному на каждый фон)
-        - создаём одну запись Generation + списываем кредиты
-        - создаём несколько задач Seedream (по фону), ждём результаты, сохраняем в БД и отправляем все фото
+        - action=next: создаём Generation, списываем кредиты, шлём задачи во все комбинации
+          (фон × волосы × стиль × соотношение сторон), с ретраями до 3 попыток на комбинацию.
+        - action=topup: просто напоминаем про пополнение
+        Ошибка по одной комбинации НЕ ломает остальные.
         """
         from fsm import GenerationFlow
         from db import GeneratedImage, ImageRole  # локальный импорт
@@ -1448,8 +2006,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         lang = await get_lang(q, db)
         action = q.data.split(":", 2)[-1]
 
-        # Отвечаем на callback сразу, чтобы не получить timeout от Telegram
-        await q.answer()
+        await q.answer()  # чтобы не словить timeout
 
         if action == "topup":
             await q.message.answer(T(lang, "no_credits"))
@@ -1460,16 +2017,15 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         data = await state.get_data()
 
-        # --- 1. Забираем file_id документа с одеждой ---
+        # --- 1. file_id исходного фото (пока работаем по первой вещи) ---
         cloth_file_ids = data.get("cloth_file_ids") or []
         if not cloth_file_ids:
             await q.message.answer(T(lang, "generation_failed"))
             await state.clear()
             return
-
         tg_file_id = cloth_file_ids[0]
 
-        # --- 2. Скачиваем байты файла из Telegram ---
+        # --- 2. скачиваем байты из Telegram ---
         file_buf = BytesIO()
         try:
             await bot.download(file=tg_file_id, destination=file_buf)
@@ -1485,7 +2041,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             logger.exception("Telegram file download failed", exc_info=e)
             return
 
-        # --- 3. Заливаем это фото в Seedream и получаем cloth_url ---
+        # --- 3. заливаем фото в Seedream и получаем cloth_url ---
         try:
             cloth_url = await asyncio.to_thread(
                 seedream.upload_image_bytes,
@@ -1504,37 +2060,68 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         upload_type = data.get("upload_type") or "flat"
 
-        # список выбранных фонов (как ключи: white / beige / pink / black)
-        bg_key = data.get("background") or "white"
-        backgrounds = data.get("backgrounds") or [bg_key]
-        # убираем дубли, сохраняем порядок
+        # --- 4. собираем параметры (со множественными вариантами) ---
+        num_items = int(data.get("num_items") or 1)
+
+        # фоны
+        backgrounds = data.get("backgrounds") or [data.get("background") or "white"]
         backgrounds = list(dict.fromkeys(backgrounds))
 
-        gender = data.get("gender") or "female"
-        hair = data.get("hair") or "any"
+        # волосы
+        hair_main = data.get("hair") or "any"
+        hair_options = data.get("hair_options") or [hair_main]
+        if not hair_options:
+            hair_options = ["any"]
+
+        # эффективные варианты для комбинаций:
+        # "any" = нет отдельного варианта, не увеличивает количество фото
+        if hair_options == ["any"]:
+            hair_combo_codes: list[str | None] = [None]  # None -> не добавляем сниппет
+        else:
+            hair_combo_codes = [h for h in HAIR_KEYS if h in hair_options and h != "any"]
+
+        # возраст
         age = data.get("age") or "young"
-        style = data.get("style") or "casual"
-        aspect = data.get("aspect") or "3_4"
 
-        # мапим в сниппеты
-        main_bg_snippet = BG_SNIPPETS[bg_key]
-        hair_snippet = HAIR_SNIPPETS[hair]
-        age_snippet = AGE_SNIPPETS[age]
-        style_snippet = STYLE_SNIPPETS[style]
-        image_size, image_resolution = ASPECT_PARAMS[aspect]
+        # стиль
+        style_main = data.get("style") or "casual"
+        style_options = data.get("style_options") or [style_main]
+        style_options = list(dict.fromkeys(style_options))
 
-        # --- 4. Считаем, сколько фото реально планируем ---
-        num_items = int(data.get("num_items") or 1)
-        total_images_planned = num_items * max(len(backgrounds), 1)
+        # аспекты
+        aspect_main = data.get("aspect") or "3_4"
+        aspect_options = data.get("aspects") or [aspect_main]
+        aspect_options = list(dict.fromkeys(aspect_options))
 
-        # --- 5. Проверяем баланс и создаём Generation (одну запись на весь набор) ---
+        gender = data.get("gender") or "female"
+
+        # сниппеты
+        age_snippet = AGE_SNIPPETS.get(age)
+        # для записи Generation берём основной фон/волосы/стиль/аспект
+        main_bg = backgrounds[0]
+        main_bg_snippet = BG_SNIPPETS[main_bg]
+        main_hair_snippet = HAIR_SNIPPETS.get(hair_main)
+        main_style_snippet = STYLE_SNIPPETS[style_main]
+        main_image_size, main_image_resolution = ASPECT_PARAMS[aspect_main]
+
+        # --- 5. считаем сколько фото планируем ---
+        bg_count = max(len(backgrounds), 1)
+        if hair_combo_codes == [None]:
+            hair_count = 1
+        else:
+            hair_count = len(hair_combo_codes)
+        style_count = max(len(style_options), 1)
+        aspect_count = max(len(aspect_options), 1)
+
+        total_images_planned = num_items * bg_count * hair_count * style_count * aspect_count
+
+        # --- 6. создаём Generation + списываем кредиты ---
         async with db.session() as s:
-            # промпт, который кладём в БД как "общий" (по основному фону)
             prompt_for_record = seedream.build_ecom_prompt(
                 gender=gender,
-                hair_color=hair_snippet,
+                hair_color=main_hair_snippet,
                 age=age_snippet,
-                style_snippet=style_snippet,
+                style_snippet=main_style_snippet,
                 background_snippet=main_bg_snippet,
             )
 
@@ -1548,20 +2135,31 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                     "scenario": "initial_generation",
                     "upload_type": upload_type,
                     "gender": gender,
-                    "hair": hair,
                     "age": age,
-                    "style": style,
-                    "background": bg_key,
+                    "background": main_bg,
                     "backgrounds": backgrounds,
-                    "aspect": aspect,
-                    "image_size": image_size,
-                    "image_resolution": image_resolution,
+                    "hair": hair_main,
+                    "hair_options": hair_options,
+                    "style": style_main,
+                    "style_options": style_options,
+                    "aspect": aspect_main,
+                    "aspects": aspect_options,
+                    "aspect_params": {
+                        k: {
+                            "image_size": ASPECT_PARAMS[k][0],
+                            "image_resolution": ASPECT_PARAMS[k][1],
+                        }
+                        for k in aspect_options
+                        if k in ASPECT_PARAMS
+                    },
+                    "image_size": main_image_size,
+                    "image_resolution": main_image_resolution,
+                    "num_items": num_items,
                 },
                 source_image_urls=[cloth_url],
             )
 
             if gen_obj is None:
-                # кредитов не хватило
                 await state.clear()
                 try:
                     await q.message.edit_text(T(lang, "no_credits"))
@@ -1571,35 +2169,77 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
             generation_id = gen_obj.id
 
-        # --- 6. Обновляем текст: задача(и) в обработке ---
+        # --- 7. обновляем текст: генерация запущена ---
         try:
             await q.message.edit_text(T(lang, "processing_generation"))
         except Exception:
             await q.message.answer(T(lang, "processing_generation"))
 
-        # --- 7. Создаём задачи Seedream по количеству выбранных фонов ---
-        try:
-            task_ids: list[str] = []
-            for bg in backgrounds:
-                bg_snip = BG_SNIPPETS[bg]
-                prompt_for_task = seedream.build_ecom_prompt(
-                    gender=gender,
-                    hair_color=hair_snippet,
-                    age=age_snippet,
-                    style_snippet=style_snippet,
-                    background_snippet=bg_snip,
-                )
-                task_id = await asyncio.to_thread(
-                    seedream.create_task,
-                    prompt_for_task,
-                    image_size=image_size,
-                    image_resolution=image_resolution,
-                    max_images=num_items,  # по одной картинке на вещь для каждого фона
-                    image_urls=[cloth_url],
-                )
-                task_ids.append(task_id)
-        except Exception as e:
-            # откат статуса и возврат кредитов
+        # --- 8. создаём задачи Seedream по всем комбинациям (с защитой от падений create_task) ---
+        task_meta_list: list[dict[str, Any]] = []
+        failed_on_create = 0
+
+        for bg in backgrounds:
+            bg_snip = BG_SNIPPETS[bg]
+
+            for hair_code in hair_combo_codes:
+                hair_snip = HAIR_SNIPPETS[hair_code] if hair_code else None
+
+                for style_code in style_options:
+                    style_snip = STYLE_SNIPPETS[style_code]
+
+                    for asp in aspect_options:
+                        image_size, image_resolution = ASPECT_PARAMS[asp]
+
+                        prompt_for_task = seedream.build_ecom_prompt(
+                            gender=gender,
+                            hair_color=hair_snip,
+                            age=age_snippet,
+                            style_snippet=style_snip,
+                            background_snippet=bg_snip,
+                        )
+
+                        try:
+                            task_id = await asyncio.to_thread(
+                                seedream.create_task,
+                                prompt_for_task,
+                                image_size=image_size,
+                                image_resolution=image_resolution,
+                                max_images=num_items,
+                                image_urls=[cloth_url],
+                            )
+
+                            task_meta_list.append(
+                                {
+                                    "task_id": task_id,
+                                    "background": bg,
+                                    "hair": hair_code or "any",
+                                    "style": style_code,
+                                    "aspect": asp,
+                                    # доп. данные для ретраев
+                                    "prompt": prompt_for_task,
+                                    "image_size": image_size,
+                                    "image_resolution": image_resolution,
+                                    "max_images": num_items,
+                                    "cloth_url": cloth_url,
+                                }
+                            )
+                        except Exception as e:
+                            failed_on_create += 1
+                            logger.exception(
+                                "Seedream create_task failed for combo",
+                                extra={
+                                    "background": bg,
+                                    "hair": hair_code,
+                                    "style": style_code,
+                                    "aspect": asp,
+                                    "error": repr(e),
+                                },
+                            )
+                            # не падаем, просто эту комбинацию пропускаем
+
+        # Если вообще не удалось создать ни одной задачи — откатываем генерацию
+        if not task_meta_list:
             async with db.session() as s:
                 gen_db: Optional[Generation] = (
                     await s.execute(
@@ -1614,7 +2254,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
                 if gen_db:
                     gen_db.status = GenerationStatus.failed
-                    gen_db.error_message = str(e)
+                    gen_db.error_message = "No Seedream tasks created"
                 if user_db and gen_db:
                     user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
 
@@ -1624,10 +2264,9 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 await q.message.edit_text(err_text)
             except Exception:
                 await q.message.answer(err_text)
-            logger.exception("Seedream create_task (multi-bg) failed", exc_info=e)
             return
 
-        # --- 8. Обновляем Generation: external_id + статус running ---
+        # --- 9. помечаем Generation как running ---
         async with db.session() as s:
             gen_db: Optional[Generation] = (
                 await s.execute(
@@ -1635,49 +2274,120 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 )
             ).scalar_one_or_none()
             if gen_db:
-                gen_db.external_id = ",".join(task_ids)
+                gen_db.external_id = ",".join(m["task_id"] for m in task_meta_list)
                 gen_db.status = GenerationStatus.running
 
-        # --- 9. Уведомляем пользователя, что задачи в очереди ---
-        first_task_id = task_ids[0] if task_ids else "-"
+        # --- 10. уведомляем пользователя о постановке задач ---
+        first_task_id = task_meta_list[0]["task_id"]
         notify_text = T(lang, "task_queued", task_id=first_task_id)
         try:
             await q.message.edit_text(notify_text)
         except Exception:
             await q.message.answer(notify_text)
 
-        # --- 10. Ждём результаты всех задач и скачиваем картинки ---
+        # --- 11. ждём результаты всех задач и качаем картинки с ретраями по каждой комбинации ---
         try:
-            image_records: list[tuple[str, bytes, str]] = []  # (resultUrl, bytes, bg_key)
+            image_records: list[dict[str, Any]] = []
+            failed_combos = 0
 
-            for bg, task_id in zip(backgrounds, task_ids):
-                task_info = await asyncio.to_thread(
-                    seedream.wait_for_result,
-                    task_id,
-                    poll_interval=5.0,
-                    timeout=180.0,
-                )
-                data_info = task_info.get("data", {})
-                result_json_str = data_info.get("resultJson")
-                if not result_json_str:
-                    raise RuntimeError(f"No resultJson in task_info={task_info!r}")
+            for meta in task_meta_list:
+                combo_success = False
+                last_error: Exception | None = None
 
-                result_obj = json.loads(result_json_str)
-                result_urls = result_obj.get("resultUrls") or []
-                if not result_urls:
-                    raise RuntimeError(f"No resultUrls in resultJson={result_obj!r}")
+                for attempt in range(1, 4):  # до 3 попыток на комбинацию
+                    task_id = meta["task_id"]
+                    try:
+                        task_info = await asyncio.to_thread(
+                            seedream.wait_for_result,
+                            task_id,
+                            poll_interval=5.0,
+                            timeout=180.0,
+                        )
+                        data_info = task_info.get("data", {})
+                        result_json_str = data_info.get("resultJson")
+                        if not result_json_str:
+                            raise RuntimeError(
+                                f"No resultJson in task_info={task_info!r}"
+                            )
 
-                for url in result_urls:
-                    download_url = await asyncio.to_thread(
-                        seedream.get_download_url, url
+                        result_obj = json.loads(result_json_str)
+                        result_urls = result_obj.get("resultUrls") or []
+                        if not result_urls:
+                            raise RuntimeError(
+                                f"No resultUrls in resultJson={result_obj!r}"
+                            )
+
+                        # если дошли сюда — эта комбинация успешно отгенерилась
+                        for url in result_urls:
+                            download_url = await asyncio.to_thread(
+                                seedream.get_download_url, url
+                            )
+                            img_bytes = await asyncio.to_thread(
+                                seedream.download_file_bytes, download_url
+                            )
+                            image_records.append(
+                                {
+                                    "url": url,
+                                    "bytes": img_bytes,
+                                    "background": meta["background"],
+                                    "hair": meta["hair"],
+                                    "style": meta["style"],
+                                    "aspect": meta["aspect"],
+                                }
+                            )
+
+                        combo_success = True
+                        break  # выходим из цикла попыток для этой комбинации
+
+                    except Exception as e:
+                        last_error = e
+                        logger.warning(
+                            "Seedream combo failed (wait/result) "
+                            "— for task {task_id}",
+                            extra={
+                                "task_id": task_id,
+                                "meta": meta,
+                                "error": repr(e),
+                            },
+                        )
+
+                        if attempt >= 3:
+                            # исчерпали попытки, выходим, комбо считаем проваленным
+                            break
+
+                        # пробуем создать новый task для этой же комбинации
+                        try:
+                            new_task_id = await asyncio.to_thread(
+                                seedream.create_task,
+                                meta["prompt"],
+                                image_size=meta["image_size"],
+                                image_resolution=meta["image_resolution"],
+                                max_images=meta.get("max_images", num_items),
+                                image_urls=[meta["cloth_url"]],
+                            )
+                            meta["task_id"] = new_task_id
+                        except Exception as e2:
+                            last_error = e2
+                            logger.warning(
+                                "Seedream re-create_task failed for combo retry",
+                                extra={
+                                    "meta": meta,
+                                    "attempt": attempt,
+                                    "error": repr(e2),
+                                },
+                            )
+                            # пойдём на следующую попытку, если она ещё есть
+                            continue
+
+                if not combo_success:
+                    failed_combos += 1
+                    logger.error(
+                        "All retries failed for combo",
+                        extra={"meta": meta, "last_error": repr(last_error)},
                     )
-                    img_bytes = await asyncio.to_thread(
-                        seedream.download_file_bytes, download_url
-                    )
-                    image_records.append((url, img_bytes, bg))
 
         except Exception as e:
-            # mark failed, return credits
+            # неожиданный общий сбой на этапе ожидания/скачивания
             async with db.session() as s:
                 gen_db: Optional[Generation] = (
                     await s.execute(
@@ -1702,10 +2412,41 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 await q.message.edit_text(err_text)
             except Exception:
                 await q.message.answer(err_text)
-            logger.exception("Seedream wait_for_result/download (multi-bg) failed", exc_info=e)
+            logger.exception(
+                "Seedream wait_for_result/download (multi-combo) failed (global)",
+                exc_info=e,
+            )
             return
 
-        # --- 11. Сохраняем результат в БД ---
+        # --- 12. если ни одной картинки так и не получили — считаем генерацию неуспешной ---
+        if not image_records:
+            async with db.session() as s:
+                gen_db: Optional[Generation] = (
+                    await s.execute(
+                        select(Generation).where(Generation.id == generation_id)
+                    )
+                ).scalar_one_or_none()
+                user_db: Optional[User] = (
+                    await s.execute(
+                        select(User).where(User.user_id == q.from_user.id)
+                    )
+                ).scalar_one_or_none()
+
+                if gen_db:
+                    gen_db.status = GenerationStatus.failed
+                    gen_db.error_message = "All Seedream combos failed"
+                if user_db and gen_db:
+                    user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
+            await state.clear()
+            err_text = T(lang, "generation_failed")
+            try:
+                await q.message.edit_text(err_text)
+            except Exception:
+                await q.message.answer(err_text)
+            return
+
+        # --- 13. сохраняем результат в БД ---
         async with db.session() as s:
             gen_db: Optional[Generation] = (
                 await s.execute(
@@ -1718,12 +2459,12 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 gen_db.images_generated = len(image_records)
                 gen_db.finished_at = datetime.now(timezone.utc)
 
-                for url, _bytes, bg_for_img in image_records:
+                for rec in image_records:
                     img = GeneratedImage(
                         generation_id=gen_db.id,
                         user_id=q.from_user.id,
                         role=ImageRole.base,
-                        storage_url=url,
+                        storage_url=rec["url"],
                         telegram_file_id=None,
                         width=None,
                         height=None,
@@ -1731,35 +2472,34 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                             "scenario": "initial_generation",
                             "upload_type": upload_type,
                             "gender": gender,
-                            "hair": hair,
                             "age": age,
-                            "style": style,
-                            "background": bg_for_img,
+                            "background": rec["background"],
                             "backgrounds": backgrounds,
-                            "aspect": aspect,
+                            "hair": rec["hair"],
+                            "hair_options": hair_options,
+                            "style": rec["style"],
+                            "style_options": style_options,
+                            "aspect": rec["aspect"],
+                            "aspects": aspect_options,
                         },
                     )
                     s.add(img)
 
-        # --- 12. Отправляем пользователю ВСЕ картинки и связываем их с БД ---
+        # --- 14. отправляем пользователю все картинки и связываем с telegram_file_id ---
         from aiogram.types import BufferedInputFile
 
-        if not image_records:
-            await q.message.answer(T(lang, "generation_failed"))
-            await state.clear()
-            return
+        sent_messages: list[tuple[str, Any]] = []
 
-        sent_messages: list[tuple[str, Any]] = []  # (storage_url, Message)
-
-        for idx, (url, img_bytes, _bg) in enumerate(image_records, start=1):
+        for idx, rec in enumerate(image_records, start=1):
             caption = T(lang, "generation_done") if idx == 1 else None
             msg = await q.message.answer_photo(
-                photo=BufferedInputFile(img_bytes, filename=f"seedream_initial_{idx}.png"),
+                photo=BufferedInputFile(
+                    rec["bytes"], filename=f"seedream_initial_{idx}.png"
+                ),
                 caption=caption,
             )
-            sent_messages.append((url, msg))
+            sent_messages.append((rec["url"], msg))
 
-        # Проставляем telegram_file_id для каждой картинки
         async with db.session() as s:
             for url, msg in sent_messages:
                 if not msg.photo:
@@ -1779,7 +2519,6 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         await state.clear()
 
-        # Дополнительно помечаем в исходном сообщении, что генерация завершена
         try:
             await q.message.edit_text(T(lang, "generation_done"))
         except Exception:

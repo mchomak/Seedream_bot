@@ -101,7 +101,10 @@ class SeedreamService:
                 data = resp.json()
                 logger.debug(
                     "[SeedreamService] POST {url} OK (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "payload": payload, "resp": data},
+                    url=url,
+                    attempt=attempt,
+                    payload=payload,
+                    resp=data,
                 )
                 return data
 
@@ -109,14 +112,18 @@ class SeedreamService:
                 last_exc = e
                 logger.warning(
                     "[SeedreamService] POST {url} failed (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "error": repr(e)},
+                    url=url,
+                    attempt=attempt,
+                    error=repr(e),
                 )
             except ValueError as e:
                 # JSON decode error
                 last_exc = e
                 logger.warning(
                     "[SeedreamService] POST {url} JSON decode failed (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "error": repr(e)},
+                    url=url,
+                    attempt=attempt,
+                    error=repr(e),
                 )
 
             if attempt < self.max_retries:
@@ -124,7 +131,8 @@ class SeedreamService:
 
         logger.exception(
             "[SeedreamService] POST {url} failed after all retries",
-            extra={"url": url, "payload": payload},
+            url=url,
+            payload=payload,
         )
         if last_exc:
             raise last_exc
@@ -145,7 +153,10 @@ class SeedreamService:
                 data = resp.json()
                 logger.debug(
                     "[SeedreamService] GET {url} OK (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "params": params, "resp": data},
+                    url=url,
+                    attempt=attempt,
+                    params=params,
+                    resp=data,
                 )
                 return data
 
@@ -153,13 +164,17 @@ class SeedreamService:
                 last_exc = e
                 logger.warning(
                     "[SeedreamService] GET {url} failed (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "params": params, "error": repr(e)},
+                    url=url,
+                    attempt=attempt,
+                    error=repr(e),
                 )
             except ValueError as e:
                 last_exc = e
                 logger.warning(
                     "[SeedreamService] GET {url} JSON decode failed (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "params": params, "error": repr(e)},
+                    url=url,
+                    attempt=attempt,
+                    error=repr(e),
                 )
 
             if attempt < self.max_retries:
@@ -167,56 +182,52 @@ class SeedreamService:
 
         logger.exception(
             "[SeedreamService] GET {url} failed after all retries",
-            extra={"url": url, "params": params},
+            url=url,
+            params=params,
         )
         if last_exc:
             raise last_exc
         raise RuntimeError(f"GET {url} failed without explicit exception")
 
 
-    def _post_multipart(
-        self,
-        url: str,
-        *,
-        files: dict,
-        data: dict,
-    ) -> dict:
+    def _post_multipart(self, url: str, files: dict, data: dict) -> dict:
         last_exc: Exception | None = None
 
         for attempt in range(1, self.max_retries + 1):
             try:
-                headers = {"Authorization": f"Bearer {self.api_key}"}
-                resp = requests.post(
+                resp = self.session.post(
                     url,
-                    headers=headers,
-                    files={**files},
-                    data={**data},
+                    files=files,
+                    data=data,
                     timeout=self.timeout,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
                 )
                 resp.raise_for_status()
-                result = resp.json()
+                resp_json = resp.json()
                 logger.debug(
                     "[SeedreamService] POST multipart {url} OK (attempt={attempt})",
-                    extra={
-                        "url": url,
-                        "attempt": attempt,
-                        "data": data,
-                        "result": result,
-                    },
+                    url=url,
+                    attempt=attempt,
+                    data=data,
+                    resp=resp_json,
                 )
-                return result
+                return resp_json
 
             except (RequestException, RemoteDisconnected) as e:
                 last_exc = e
                 logger.warning(
                     "[SeedreamService] POST multipart {url} failed (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "data": data, "error": repr(e)},
+                    url=url,
+                    attempt=attempt,
+                    error=repr(e),
                 )
             except ValueError as e:
                 last_exc = e
                 logger.warning(
                     "[SeedreamService] POST multipart {url} JSON decode failed (attempt={attempt})",
-                    extra={"url": url, "attempt": attempt, "data": data, "error": repr(e)},
+                    url=url,
+                    attempt=attempt,
+                    error=repr(e),
                 )
 
             if attempt < self.max_retries:
@@ -224,7 +235,8 @@ class SeedreamService:
 
         logger.exception(
             "[SeedreamService] POST multipart {url} failed after all retries",
-            extra={"url": url, "data": data},
+            url=url,
+            data=data,
         )
         if last_exc:
             raise last_exc
@@ -374,7 +386,8 @@ class SeedreamService:
                 resp.raise_for_status()
                 logger.debug(
                     "[SeedreamService] download_file_bytes OK (attempt={attempt})",
-                    extra={"url": download_url, "attempt": attempt},
+                    attempt=attempt,
+                    download_url=download_url,
                 )
                 return resp.content
 
@@ -382,7 +395,9 @@ class SeedreamService:
                 last_exc = e
                 logger.warning(
                     "[SeedreamService] download_file_bytes failed (attempt={attempt})",
-                    extra={"url": download_url, "attempt": attempt, "error": repr(e)},
+                    attempt=attempt,
+                    download_url=download_url,
+                    error=repr(e),
                 )
 
             if attempt < self.max_retries:
@@ -390,11 +405,13 @@ class SeedreamService:
 
         logger.exception(
             "[SeedreamService] download_file_bytes failed after all retries",
-            extra={"url": download_url},
+            download_url=download_url,
         )
         if last_exc:
             raise last_exc
-        raise RuntimeError("download_file_bytes failed without explicit exception")
+        raise RuntimeError(
+            f"download_file_bytes {download_url} failed without explicit exception"
+        )
 
 
     # -------------------------------------------------------------------------

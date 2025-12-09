@@ -166,9 +166,10 @@ phrases = {
 
         # цвет волос
         "settings_hair_title": (
-            "Выберите цвет волос модели.\n\n"
-            "Важно: позже можно будет добавить поддержку нескольких вариантов, "
-            "сейчас выбирается один."
+            "Выберите один или несколько цветов волос модели.\n\n"
+            "ВАЖНО: выбор нескольких вариантов в этом и других пунктах (фон, стиль, соотношение сторон) "
+            "перемножает количество создаваемых фото.\n"
+            "Вариант «Любой» не увеличивает количество фото и не добавляет уточнение по цвету волос в промпт."
         ),
         "btn_hair_any": "Любой",
         "btn_hair_dark": "Тёмные",
@@ -183,18 +184,29 @@ phrases = {
 
         # стиль
         "settings_style_title": (
-            "Выберите стиль фото на выходе.\n\n"
-            "Стиль влияет на то, как нейросеть обработает одежду и модель."
+            "Выберите один или несколько стилей фото на выходе.\n\n"
+            "Стиль влияет на то, как нейросеть обработает одежду и модель. "
+            "Несколько стилей увеличивают количество создаваемых фото."
         ),
         "btn_style_strict": "Строгий",
         "btn_style_luxury": "Люксовый",
         "btn_style_casual": "Кэжуал",
         "btn_style_sport": "Спортивный",
 
+        "hair_selected_header": "Выбранные цвета волос:",
+        "hair_need_one": "Выберите хотя бы один вариант цвета волос, чтобы продолжить.",
+
+        "style_selected_header": "Выбранные стили:",
+        "style_need_one": "Выберите хотя бы один стиль, чтобы продолжить.",
+
+        "aspect_selected_header": "Выбранные соотношения сторон:",
+        "aspect_need_one": "Выберите хотя бы одно соотношение сторон, чтобы продолжить.",
+
         # соотношение сторон
         "settings_aspect_title": (
-            "Выберите соотношение сторон кадра.\n\n"
-            "Все фото создаются в разрешении 4K."
+            "Выберите одно или несколько соотношений сторон кадра.\n\n"
+            "Все фото создаются в разрешении 4K. "
+            "Несколько соотношений сторон увеличивают количество фото."
         ),
         "btn_aspect_3_4": "3:4 (3072x4096) — маркетплейсы",
         "btn_aspect_9_16": "9:16 (2304x4096) — сторис",
@@ -425,8 +437,10 @@ phrases = {
         "btn_gender_male": "Male",
 
         "settings_hair_title": (
-            "Choose model hair color.\n\n"
-            "Multiple options will be supported later, now only one can be selected."
+            "Select one or more hair colors for the model.\n\n"
+            "IMPORTANT: choosing multiple options here and in other steps "
+            "(background, style, aspect ratio) multiplies the number of images.\n"
+            "Option “Any” does not increase the image count and does not add a hair-color constraint to the prompt."
         ),
         "btn_hair_any": "Any",
         "btn_hair_dark": "Dark",
@@ -439,8 +453,9 @@ phrases = {
         "btn_age_teen": "Teenager",
 
         "settings_style_title": (
-            "Choose the output photo style.\n\n"
-            "It affects how the model and clothing will look."
+            "Select one or more output photo styles.\n\n"
+            "The style affects how the model and clothing will look. "
+            "Multiple styles increase the number of generated images."
         ),
         "btn_style_strict": "Strict",
         "btn_style_luxury": "Luxury",
@@ -448,9 +463,19 @@ phrases = {
         "btn_style_sport": "Sport",
 
         "settings_aspect_title": (
-            "Choose aspect ratio for the image.\n\n"
-            "All images are generated in 4K resolution."
+            "Select one or more aspect ratios.\n\n"
+            "All images are generated in 4K resolution. "
+            "Multiple aspect ratios increase the number of images."
         ),
+        "hair_selected_header": "Selected hair colors:",
+        "hair_need_one": "Please select at least one hair color to continue.",
+
+        "style_selected_header": "Selected styles:",
+        "style_need_one": "Please select at least one style to continue.",
+
+        "aspect_selected_header": "Selected aspect ratios:",
+        "aspect_need_one": "Please select at least one aspect ratio to continue.",
+
         "btn_aspect_3_4": "3:4 (3072x4096) — marketplaces",
         "btn_aspect_9_16": "9:16 (2304x4096) — stories",
         "btn_aspect_1_1": "1:1 (4096x4096) — square",
