@@ -2524,6 +2524,8 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                         logger.warning(f"Failed to create generation for combo: bg={bg}, hair={hair_code}, style={style_code}, aspect={asp}")
                                         continue
 
+                                    # Flush to ensure the ID is assigned
+                                    await s.flush()
                                     generation_id = gen_obj.id
 
                                 try:
@@ -2679,6 +2681,8 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                         logger.warning(f"Failed to create generation for combo: bg={bg}, hair={hair_code}, style={style_code}, aspect={asp}")
                                         continue
 
+                                    # Flush to ensure the ID is assigned
+                                    await s.flush()
                                     generation_id = gen_obj.id
 
                                 try:
