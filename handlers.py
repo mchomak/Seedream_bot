@@ -1,9 +1,7 @@
 # handlers.py
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from decimal import Decimal
 from typing import Optional, Any
 
 from aiogram import Router, F, Bot
@@ -11,7 +9,6 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
     Message,
-    BotCommand,
     LabeledPrice,
     PreCheckoutQuery,
     InlineKeyboardMarkup,
@@ -19,7 +16,7 @@ from aiogram.types import (
     CallbackQuery,
 )
 from loguru import logger
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fsm import AnyInput
 from db import (
@@ -30,176 +27,28 @@ from db import (
     TransactionStatus,
     Generation,
     GenerationStatus,
+    GeneratedImage,
+    ImageRole,
     upsert_user_basic,
     record_transaction,
-    create_generation,
 )
 from fsm import PaymentFlow, set_waiting_payment, PaymentGuard
-from text import phrases
 from seedream_service import SeedreamService
 from config import *
 import asyncio
 import json
 from io import BytesIO
 
-
-# ---------- i18n helpers ----------
-async def get_lang(event: Message | CallbackQuery, db: Optional[Database] = None) -> str:
-    """
-    Resolve user language with priority:
-    1) users.lang from DB (if present)
-    2) Telegram UI language_code (ru -> ru, otherwise en)
-    """
-    # Try DB first
-    try:
-        if db and (getattr(event, "from_user", None) is not None):
-            uid = event.from_user.id
-            async with db.session() as s:
-                row = await s.execute(select(User.lang).where(User.user_id == uid))
-                lang = row.scalar_one_or_none()
-                if lang and lang in phrases:
-                    return lang
-    except Exception:
-        # don't break flow on DB read error; fallback to UI code
-        pass
-
-    # Fallback to Telegram UI language
-    code = (getattr(event, "from_user", None) and event.from_user.language_code) or "en"
-    return "ru" if code and str(code).lower().startswith("ru") else "en"
-
-
-def T(locale: str, key: str, **fmt) -> str:
-    """Get string from `phrases` with fallback to English."""
-    val = phrases.get(locale, {}).get(key) or phrases["en"].get(key) or key
-    return val.format(**fmt)
-
-
-def T_item(locale: str, key: str, subkey: str) -> str:
-    """Get nested item e.g. phrases[locale]['help_items']['start']."""
-    return (
-        phrases.get(locale, {}).get(key, {}).get(subkey)
-        or phrases["en"].get(key, {}).get(subkey, subkey)
-    )
-
-
-# ---------- commands install ----------
-
-
-async def install_bot_commands(bot: Bot, lang: str = "en") -> None:
-    items = phrases[lang]["help_items"]
-    cmds = [
-        BotCommand(command="start", description=items["start"]),
-        BotCommand(command="help", description=items["help"]),
-        BotCommand(command="profile", description=items["profile"]),
-        BotCommand(command="generate", description=items["generate"]),
-        BotCommand(command="examples", description=items["examples"]),
-        BotCommand(command="buy", description=items["buy"]),
-        BotCommand(command="language", description=items["language"]),
-        BotCommand(command="cancel", description=items["cancel"]),
-    ]
-    await bot.set_my_commands(cmds)
-    logger.info("Bot commands installed", extra={"lang": lang})
-
-
-# ---------- profile ----------
-
-
-@dataclass
-class Profile:
-    user: Optional[User]
-    txn_count: int
-    txn_sum: Decimal
-    currency: str
-    credits_balance: int
-    money_balance: Decimal
-
-
-async def get_profile(session: AsyncSession, *, tg_user_id: int) -> Profile:
-    """Return user profile with succeeded tx stats and credits/money balances."""
-    user = (
-        await session.execute(select(User).where(User.user_id == tg_user_id))
-    ).scalar_one_or_none()
-
-    stats = (
-        await session.execute(
-            select(
-                func.count(Transaction.id),
-                func.coalesce(func.sum(Transaction.amount), 0),
-                func.coalesce(func.max(Transaction.currency), "XTR"),
-            ).where(
-                (Transaction.user_id == tg_user_id)
-                & (Transaction.status == TransactionStatus.succeeded)
-            )
-        )
-    ).first()
-
-    txn_count = int(stats[0] or 0)
-    txn_sum = Decimal(str(stats[1] or 0))
-    currency = str(stats[2] or "XTR")
-
-    credits_balance = int(user.credits_balance) if user else 0
-    money_balance = (
-        Decimal(str(user.money_balance)) if (user and user.money_balance is not None) else Decimal("0.00")
-    )
-
-    return Profile(
-        user=user,
-        txn_count=txn_count,
-        txn_sum=txn_sum,
-        currency=currency,
-        credits_balance=credits_balance,
-        money_balance=money_balance,
-    )
-
-
-async def ensure_credits_and_create_generation(
-    session: AsyncSession,
-    *,
-    tg_user_id: int,
-    prompt: str,
-    scenario_key: str,
-    total_images_planned: int,
-    params: Optional[dict[str, Any]] = None,
-    source_image_urls: Optional[list[str]] = None,
-) -> tuple[Optional[Generation], Optional[User], int]:
-    """
-    Проверить баланс, списать кредиты и создать Generation.
-
-    Возвращает (generation | None, user | None, price_credits).
-    Если кредитов не хватило — generation=None, user=None.
-    """
-    # узнаём цену сценария
-    price = GEN_SCENARIO_PRICES.get(scenario_key, 1)
-
-    user = (
-        await session.execute(select(User).where(User.user_id == tg_user_id))
-    ).scalar_one_or_none()
-
-    if user is None:
-        return None, None, price
-
-    current_balance = int(user.credits_balance or 0)
-    if current_balance < price:
-        return None, user, price
-
-    # списываем кредиты
-    user.credits_balance = current_balance - price
-
-    # создаём запись Generation
-    generation = await create_generation(
-        session,
-        user_id=tg_user_id,
-        prompt=prompt,
-        model_name="seedream-4.0",
-        params=params,
-        source_image_urls=source_image_urls,
-        total_images_planned=total_images_planned,
-        credits_spent=price,
-        status=GenerationStatus.queued,
-        external_id=None,
-    )
-    # session.add(generation) уже внутри create_generation
-    return generation, user, price
+# Import helper functions from modular structure
+from handlers.i18n_helpers import get_lang, T, T_item, install_bot_commands
+from handlers.db_helpers import Profile, get_profile, ensure_credits_and_create_generation
+from handlers.keyboards import (
+    build_lang_kb as _build_lang_kb,
+    build_background_keyboard,
+    build_hair_keyboard,
+    build_style_keyboard,
+    build_aspect_keyboard,
+)
 
 
 # ---------- payments (Stars) ----------
@@ -322,220 +171,6 @@ class StarsPay:
                 "amount_stars": amount_stars,
             },
         )
-
-
-# ---------- language utils ----------
-
-
-def _lang_display_name(code: str) -> str:
-    # simple autonyms; fallback to uppercased code
-    mapping = {
-        "ru": "Русский",
-        "en": "English",
-    }
-    return mapping.get(code, code.upper())
-
-
-def _build_lang_kb() -> InlineKeyboardMarkup:
-    codes = list(phrases.keys())
-    buttons = [
-        InlineKeyboardButton(text=_lang_display_name(code), callback_data=f"set_lang:{code}")
-        for code in codes
-    ]
-    # chunk by 2 per row
-    rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-def build_background_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
-    """
-    Клавиатура выбора фона с чекбоксами (галочки на выбранных цветах).
-    """
-    def btn_text(key: str, phrase_key: str) -> str:
-        base = T(lang, phrase_key)
-        return f"✅ {base}" if key in selected else base
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=btn_text("white", "btn_bg_white"),
-                    callback_data="gen:bg:white",
-                ),
-                InlineKeyboardButton(
-                    text=btn_text("beige", "btn_bg_beige"),
-                    callback_data="gen:bg:beige",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("pink", "btn_bg_pink"),
-                    callback_data="gen:bg:pink",
-                ),
-                InlineKeyboardButton(
-                    text=btn_text("black", "btn_bg_black"),
-                    callback_data="gen:bg:black",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_next"),
-                    callback_data="gen:bg:next",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_back"),
-                    callback_data="gen:back_to_types",
-                )
-            ],
-        ]
-    )
-
-
-def build_hair_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
-    """
-    Клавиатура мультивыбора цвета волос с галочками.
-    """
-    def btn_text(key: str, phrase_key: str) -> str:
-        base = T(lang, phrase_key)
-        return f"✅ {base}" if key in selected else base
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=btn_text("any", "btn_hair_any"),
-                    callback_data="gen:hair:any",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("dark", "btn_hair_dark"),
-                    callback_data="gen:hair:dark",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("light", "btn_hair_light"),
-                    callback_data="gen:hair:light",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_next"),
-                    callback_data="gen:hair:next",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_back"),
-                    callback_data="gen:back_to_gender",
-                )
-            ],
-        ]
-    )
-
-
-def build_style_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
-    """
-    Клавиатура мультивыбора стиля фото.
-    """
-    def btn_text(key: str, phrase_key: str) -> str:
-        base = T(lang, phrase_key)
-        return f"✅ {base}" if key in selected else base
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=btn_text("strict", "btn_style_strict"),
-                    callback_data="gen:style:strict",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("luxury", "btn_style_luxury"),
-                    callback_data="gen:style:luxury",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("casual", "btn_style_casual"),
-                    callback_data="gen:style:casual",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("sport", "btn_style_sport"),
-                    callback_data="gen:style:sport",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_next"),
-                    callback_data="gen:style:next",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_back"),
-                    callback_data="gen:back_to_age",
-                )
-            ],
-        ]
-    )
-
-
-def build_aspect_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup:
-    """
-    Клавиатура мультивыбора соотношения сторон.
-    """
-    def btn_text(key: str, phrase_key: str) -> str:
-        base = T(lang, phrase_key)
-        return f"✅ {base}" if key in selected else base
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=btn_text("3_4", "btn_aspect_3_4"),
-                    callback_data="gen:aspect:3_4",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("9_16", "btn_aspect_9_16"),
-                    callback_data="gen:aspect:9_16",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("1_1", "btn_aspect_1_1"),
-                    callback_data="gen:aspect:1_1",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=btn_text("16_9", "btn_aspect_16_9"),
-                    callback_data="gen:aspect:16_9",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_next"),
-                    callback_data="gen:aspect:next",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=T(lang, "btn_back"),
-                    callback_data="gen:back_to_style",
-                )
-            ],
-        ]
-    )
-
 
 
 # ---------- core router ----------
