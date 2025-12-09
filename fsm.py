@@ -72,6 +72,8 @@ class GenerationFlow(StatesGroup):
     choosing_style = State()
     choosing_aspect = State()
     confirming = State()
+    reviewing_photos = State()  # Interactive photo approval
+    new_angles_poses = State()  # Stub for future implementation
 
 
 # ---------- payment meta ----------

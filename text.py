@@ -236,6 +236,26 @@ phrases = {
         "btn_next": "Далее",
         "btn_confirm_next": "Далее",
         "btn_confirm_topup": "Пополнить баланс",
+
+        # Photo review buttons
+        "btn_approve": "✅ Утвердить",
+        "btn_redo": "🔄 Переделать",
+        "btn_reject": "❌ Отклонить",
+        "btn_redo_same": "🔄 Переделать с теми же настройками",
+        "btn_redo_new": "⚙️ Переделать с новыми настройками",
+        "btn_return_menu": "🏠 Вернуться в главное меню",
+        "btn_topup_balance": "💳 Пополнить баланс",
+
+        # Photo review messages
+        "photo_review_title": "Фото {current} из {total}",
+        "photo_review_question": "Что сделать с этим фото?",
+        "photo_approved": "Фото утверждено!",
+        "photo_rejected": "Фото отклонено.",
+        "redo_question": "Хотите переделать фото?",
+        "insufficient_balance": "Недостаточно средств для повторной генерации. Пожалуйста, пополните баланс.",
+        "no_more_photos": "Больше нет фотографий в очереди.",
+        "all_photos_reviewed": "Все фотографии просмотрены. У вас есть {approved} утверждённых фото.",
+        "moving_to_angles": "Переход к выбору новых ракурсов и поз...",
         "upload_doc_only": "Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия).",
         "upload_doc_wrong_type": "Это не похоже на изображение. Пожалуйста, отправьте фотографию одежды как документ (файл).",
 
@@ -522,6 +542,27 @@ phrases = {
         "btn_next": "Next",
         "btn_confirm_next": "Next",
         "btn_confirm_topup": "Top up balance",
+
+        # Photo review buttons
+        "btn_approve": "✅ Approve",
+        "btn_redo": "🔄 Redo",
+        "btn_reject": "❌ Reject",
+        "btn_redo_same": "🔄 Redo with same settings",
+        "btn_redo_new": "⚙️ Redo with new settings",
+        "btn_return_menu": "🏠 Return to main menu",
+        "btn_topup_balance": "💳 Top up balance",
+
+        # Photo review messages
+        "photo_review_title": "Photo {current} of {total}",
+        "photo_review_question": "What would you like to do with this photo?",
+        "photo_approved": "Photo approved!",
+        "photo_rejected": "Photo rejected.",
+        "redo_question": "Would you like to redo the photo?",
+        "insufficient_balance": "Insufficient balance for regeneration. Please top up your balance.",
+        "no_more_photos": "No more photos in queue.",
+        "all_photos_reviewed": "All photos reviewed. You have {approved} approved photo(s).",
+        "moving_to_angles": "Moving to new angles and poses selection...",
+
         "upload_doc_only": "Please send the photo as a document in original quality (without compression).",
         "upload_doc_wrong_type": "This does not look like an image. Please send the clothing photo as a document (file).",
 
