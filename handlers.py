@@ -2585,43 +2585,706 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 )
                 s.add(img)
 
-        # --- 14. отправляем пользователю все картинки и связываем с telegram_file_id ---
+        # --- 14. Initialize photo review workflow ---
+        # Store all photos in state for interactive review
+        await state.update_data(
+            review_photos=image_records,  # All generated photos
+            current_photo_index=0,  # Index of currently displayed photo
+            approved_photos=[],  # List of approved photo indices
+            rejected_photos=[],  # List of rejected photo indices
+        )
+
+        # Set state to reviewing_photos
+        await state.set_state(GenerationFlow.reviewing_photos)
+
+        # Show first photo with approval buttons
+        await _show_photo_for_review(q.message, state, lang, db)
+
+
+    # --- Photo review helper function ---
+    async def _show_photo_for_review(message: Message, state: FSMContext, lang: str, db: Database):
+        """Show current photo with approval buttons."""
         from aiogram.types import BufferedInputFile
 
-        sent_messages: list[tuple[str, Any]] = []
+        data = await state.get_data()
+        photos = data.get("review_photos", [])
+        current_idx = data.get("current_photo_index", 0)
+        approved = data.get("approved_photos", [])
 
-        for idx, rec in enumerate(image_records, start=1):
-            caption = T(lang, "generation_done") if idx == 1 else None
-            msg = await q.message.answer_photo(
-                photo=BufferedInputFile(
-                    rec["bytes"], filename=f"seedream_initial_{idx}.png"
-                ),
-                caption=caption,
+        if current_idx >= len(photos):
+            # No more photos to review
+            if approved:
+                # Has approved photos - move to new angles/poses stage (stub)
+                await message.answer(T(lang, "all_photos_reviewed", approved=len(approved)))
+                await message.answer(T(lang, "moving_to_angles"))
+                await state.set_state(GenerationFlow.new_angles_poses)
+            else:
+                # No approved photos - show redo dialog
+                await message.answer(T(lang, "no_more_photos"))
+            return
+
+        # Get current photo
+        photo = photos[current_idx]
+        total = len(photos)
+        caption = f"{T(lang, 'photo_review_title', current=current_idx + 1, total=total)}\n\n{T(lang, 'photo_review_question')}"
+
+        # Send as uncompressed document for original quality
+        doc_msg = await message.answer_document(
+            document=BufferedInputFile(
+                photo["bytes"],
+                filename=f"generation_{current_idx + 1}.png"
+            ),
+            caption=caption,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_approve"),
+                            callback_data=f"review:approve:{current_idx}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_redo"),
+                            callback_data=f"review:redo:{current_idx}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_reject"),
+                            callback_data=f"review:reject:{current_idx}"
+                        )
+                    ],
+                ]
             )
-            sent_messages.append((rec["url"], msg))
+        )
 
-        async with db.session() as s:
-            for url, msg in sent_messages:
-                if not msg.photo:
-                    continue
-                tele_file_id = msg.photo[-1].file_id
-                img_db: Optional[GeneratedImage] = (
+        # Store document file_id for later use
+        if doc_msg.document:
+            async with db.session() as s:
+                img_db = (
                     await s.execute(
                         select(GeneratedImage).where(
-                            GeneratedImage.user_id == q.from_user.id,
-                            GeneratedImage.storage_url == url,
+                            GeneratedImage.user_id == message.from_user.id,
+                            GeneratedImage.storage_url == photo["url"],
                         )
                     )
                 ).scalar_one_or_none()
                 if img_db:
-                    img_db.telegram_file_id = tele_file_id
+                    img_db.telegram_file_id = doc_msg.document.file_id
 
-        await state.clear()
 
+    # --- Photo review handlers ---
+    @r.callback_query(F.data.startswith("review:approve:"))
+    async def on_photo_approve(q: CallbackQuery, state: FSMContext):
+        """Handle photo approval."""
+        lang = await get_lang(q, db)
+        current = await state.get_state()
+
+        if current != GenerationFlow.reviewing_photos.state:
+            await q.answer()
+            return
+
+        # Get photo index from callback data
+        photo_idx = int(q.data.split(":")[-1])
+
+        # Update state
+        data = await state.get_data()
+        approved = data.get("approved_photos", [])
+        if photo_idx not in approved:
+            approved.append(photo_idx)
+
+        await state.update_data(
+            approved_photos=approved,
+            current_photo_index=photo_idx + 1
+        )
+
+        await q.answer(T(lang, "photo_approved"))
+
+        # Delete the current message
         try:
-            await q.message.edit_text(T(lang, "generation_done"))
+            await q.message.delete()
         except Exception:
             pass
+
+        # Show next photo
+        await _show_photo_for_review(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data.startswith("review:reject:"))
+    async def on_photo_reject(q: CallbackQuery, state: FSMContext):
+        """Handle photo rejection."""
+        lang = await get_lang(q, db)
+        current = await state.get_state()
+
+        if current != GenerationFlow.reviewing_photos.state:
+            await q.answer()
+            return
+
+        photo_idx = int(q.data.split(":")[-1])
+
+        # Update state
+        data = await state.get_data()
+        rejected = data.get("rejected_photos", [])
+        if photo_idx not in rejected:
+            rejected.append(photo_idx)
+
+        photos = data.get("review_photos", [])
+        approved = data.get("approved_photos", [])
+
+        await state.update_data(
+            rejected_photos=rejected,
+            current_photo_index=photo_idx + 1
+        )
+
+        await q.answer(T(lang, "photo_rejected"))
+
+        # Delete the current message
+        try:
+            await q.message.delete()
+        except Exception:
+            pass
+
+        # Check if this was the only photo and there are no approved ones
+        if len(photos) == 1 and not approved:
+            # Show redo dialog for single photo
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_redo_same"),
+                            callback_data="review:redo_single:same"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_redo_new"),
+                            callback_data="review:redo_single:new"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_return_menu"),
+                            callback_data="gen:back_to_start"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_topup_balance"),
+                            callback_data="gen:topup"
+                        )
+                    ],
+                ]
+            )
+            await q.message.answer(T(lang, "redo_question"), reply_markup=kb)
+        else:
+            # Show next photo
+            await _show_photo_for_review(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data.startswith("review:redo:"))
+    async def on_photo_redo(q: CallbackQuery, state: FSMContext):
+        """Handle photo redo request."""
+        lang = await get_lang(q, db)
+        current = await state.get_state()
+
+        if current != GenerationFlow.reviewing_photos.state:
+            await q.answer()
+            return
+
+        photo_idx = int(q.data.split(":")[-1])
+
+        # Check if user has enough credits (1 credit per generation)
+        async with db.session() as s:
+            user_db = (
+                await s.execute(select(User).where(User.user_id == q.from_user.id))
+            ).scalar_one_or_none()
+
+            if not user_db or (user_db.credits_balance or 0) < 1:
+                # Insufficient balance
+                kb = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text=T(lang, "btn_topup_balance"),
+                                callback_data="gen:topup"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                text=T(lang, "btn_back"),
+                                callback_data="review:back_to_review"
+                            )
+                        ],
+                    ]
+                )
+                await q.answer(T(lang, "insufficient_balance"), show_alert=True)
+                await q.message.answer(T(lang, "insufficient_balance"), reply_markup=kb)
+                return
+
+        # Implement regeneration with same settings
+        data = await state.get_data()
+        photos = data.get("review_photos", [])
+
+        if photo_idx >= len(photos):
+            await q.answer("Photo not found", show_alert=True)
+            return
+
+        photo = photos[photo_idx]
+        generation_id = photo.get("generation_id")
+
+        if not generation_id:
+            await q.answer("Cannot retrieve generation parameters", show_alert=True)
+            return
+
+        # Retrieve original generation parameters from database
+        async with db.session() as s:
+            original_gen = (
+                await s.execute(select(Generation).where(Generation.id == generation_id))
+            ).scalar_one_or_none()
+
+            if not original_gen:
+                await q.answer("Original generation not found", show_alert=True)
+                return
+
+            # Create new generation with same parameters
+            gen_obj, user, price = await ensure_credits_and_create_generation(
+                s,
+                tg_user_id=q.from_user.id,
+                prompt=original_gen.prompt,
+                scenario_key="initial_generation",
+                total_images_planned=1,
+                params=original_gen.params,
+                source_image_urls=original_gen.source_image_urls,
+            )
+
+            if gen_obj is None:
+                await q.answer(T(lang, "insufficient_balance"), show_alert=True)
+                return
+
+            await s.flush()
+            new_generation_id = gen_obj.id
+
+        # Show processing message
+        try:
+            await q.message.edit_caption(caption=T(lang, "processing_generation"))
+        except Exception:
+            await q.message.answer(T(lang, "processing_generation"))
+
+        await q.answer()
+
+        # Submit task to Seedream
+        try:
+            async with db.session() as s:
+                original_gen_refresh = (
+                    await s.execute(select(Generation).where(Generation.id == generation_id))
+                ).scalar_one_or_none()
+
+                params = original_gen_refresh.params or {}
+                aspect = params.get("aspect", "3_4")
+                image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
+
+                task_id = await asyncio.to_thread(
+                    seedream.create_task,
+                    prompt=original_gen_refresh.prompt,
+                    image_url=original_gen_refresh.source_image_urls[0] if original_gen_refresh.source_image_urls else None,
+                    image_size=image_size,
+                    image_resolution=image_resolution,
+                )
+
+                # Update generation status
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.external_id = task_id
+                    gen_db.status = GenerationStatus.running
+
+        except Exception as e:
+            # Refund credits on task creation failure
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                user_db = (
+                    await s.execute(select(User).where(User.user_id == q.from_user.id))
+                ).scalar_one_or_none()
+
+                if gen_db:
+                    gen_db.status = GenerationStatus.failed
+                    gen_db.error_message = f"Task creation failed: {str(e)}"
+                    gen_db.finished_at = datetime.now(timezone.utc)
+                if user_db and gen_db:
+                    user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
+            logger.exception("Seedream create_task failed (redo)", exc_info=e)
+            await q.message.answer(T(lang, "generation_failed"))
+            return
+
+        # Poll for results (with retry logic)
+        max_retries = 3
+        retry_count = 0
+        last_error = None
+        result_urls = None
+
+        while retry_count < max_retries:
+            try:
+                result_urls = await asyncio.to_thread(seedream.poll_task, task_id)
+                if result_urls:
+                    break
+            except Exception as e:
+                last_error = e
+                retry_count += 1
+                if retry_count < max_retries:
+                    await asyncio.sleep(2 ** retry_count)
+
+        if not result_urls:
+            # All retries failed - refund credits
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                user_db = (
+                    await s.execute(select(User).where(User.user_id == q.from_user.id))
+                ).scalar_one_or_none()
+
+                if gen_db:
+                    gen_db.status = GenerationStatus.failed
+                    gen_db.error_message = f"All retries failed: {str(last_error)}"
+                    gen_db.finished_at = datetime.now(timezone.utc)
+                if user_db and gen_db:
+                    user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
+            logger.error("Seedream poll_task failed after all retries (redo)", extra={"error": repr(last_error)})
+            await q.message.answer(T(lang, "generation_failed"))
+            return
+
+        # Download new image
+        try:
+            download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+            img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+        except Exception as e:
+            logger.exception("Failed to download regenerated image", exc_info=e)
+            await q.message.answer(T(lang, "generation_failed"))
+            return
+
+        # Update generation status to succeeded
+        async with db.session() as s:
+            gen_db = (
+                await s.execute(select(Generation).where(Generation.id == new_generation_id))
+            ).scalar_one_or_none()
+            if gen_db:
+                gen_db.status = GenerationStatus.succeeded
+                gen_db.images_generated = 1
+                gen_db.finished_at = datetime.now(timezone.utc)
+
+            # Save to database
+            img = GeneratedImage(
+                generation_id=new_generation_id,
+                telegram_file_id=None,
+                source_url=result_urls[0],
+                role=ImageRole.base,
+            )
+            s.add(img)
+
+        # Replace photo in review list
+        photos[photo_idx] = {
+            "url": result_urls[0],
+            "bytes": img_bytes,
+            "generation_id": new_generation_id,
+            "background": photo.get("background"),
+            "hair": photo.get("hair"),
+            "style": photo.get("style"),
+            "aspect": photo.get("aspect"),
+        }
+        await state.update_data(review_photos=photos)
+
+        # Show the new photo
+        await _show_photo_for_review(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data == "review:back_to_review")
+    async def on_back_to_review(q: CallbackQuery, state: FSMContext):
+        """Return to photo review."""
+        lang = await get_lang(q, db)
+        try:
+            await q.message.delete()
+        except Exception:
+            pass
+        await _show_photo_for_review(q.message, state, lang, db)
+        await q.answer()
+
+
+    @r.callback_query(F.data.startswith("review:redo_single:"))
+    async def on_single_photo_redo(q: CallbackQuery, state: FSMContext):
+        """Handle redo for single photo batch."""
+        lang = await get_lang(q, db)
+        action = q.data.split(":")[-1]
+
+        if action == "new":
+            # Return to design stage with option to start fresh generation
+            data = await state.get_data()
+            photos = data.get("review_photos", [])
+
+            if photos:
+                # Store the rejected photo info for potential replacement later
+                photo = photos[0]
+                generation_id = photo.get("generation_id")
+
+                # Get original cloth file IDs if available
+                cloth_file_ids = data.get("cloth_file_ids", [])
+
+                # Clear state and restart generation flow
+                await state.clear()
+
+                # If we have the original cloth files, restore them
+                if cloth_file_ids:
+                    await state.update_data(cloth_file_ids=cloth_file_ids, num_items=len(cloth_file_ids))
+
+                # Show upload type selection to restart the flow
+                await q.message.answer(
+                    T(lang, "upload_type_prompt"),
+                    reply_markup=InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [
+                                InlineKeyboardButton(
+                                    text=T(lang, "btn_flat"),
+                                    callback_data="gen:type:flat"
+                                )
+                            ],
+                            [
+                                InlineKeyboardButton(
+                                    text=T(lang, "btn_model"),
+                                    callback_data="gen:type:model"
+                                )
+                            ],
+                            [
+                                InlineKeyboardButton(
+                                    text=T(lang, "btn_back"),
+                                    callback_data="gen:back_to_start"
+                                )
+                            ],
+                        ]
+                    )
+                )
+                await state.set_state(GenerationFlow.selecting_upload_type)
+                await q.answer()
+            else:
+                await state.clear()
+                await q.message.answer(T(lang, "start_generation"))
+                await q.answer()
+
+        elif action == "same":
+            # Redo with same settings
+            data = await state.get_data()
+            photos = data.get("review_photos", [])
+
+            if not photos:
+                await q.answer("No photo to regenerate", show_alert=True)
+                return
+
+            photo = photos[0]
+            generation_id = photo.get("generation_id")
+
+            if not generation_id:
+                await q.answer("Cannot retrieve generation parameters", show_alert=True)
+                return
+
+            # Check balance first
+            async with db.session() as s:
+                user_db = (
+                    await s.execute(select(User).where(User.user_id == q.from_user.id))
+                ).scalar_one_or_none()
+
+                if not user_db or (user_db.credits_balance or 0) < 1:
+                    kb = InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [
+                                InlineKeyboardButton(
+                                    text=T(lang, "btn_topup_balance"),
+                                    callback_data="gen:topup"
+                                )
+                            ],
+                            [
+                                InlineKeyboardButton(
+                                    text=T(lang, "btn_return_menu"),
+                                    callback_data="gen:back_to_start"
+                                )
+                            ],
+                        ]
+                    )
+                    await q.answer(T(lang, "insufficient_balance"), show_alert=True)
+                    await q.message.answer(T(lang, "insufficient_balance"), reply_markup=kb)
+                    return
+
+                # Retrieve original generation
+                original_gen = (
+                    await s.execute(select(Generation).where(Generation.id == generation_id))
+                ).scalar_one_or_none()
+
+                if not original_gen:
+                    await q.answer("Original generation not found", show_alert=True)
+                    return
+
+                # Create new generation with same parameters
+                gen_obj, user, price = await ensure_credits_and_create_generation(
+                    s,
+                    tg_user_id=q.from_user.id,
+                    prompt=original_gen.prompt,
+                    scenario_key="initial_generation",
+                    total_images_planned=1,
+                    params=original_gen.params,
+                    source_image_urls=original_gen.source_image_urls,
+                )
+
+                if gen_obj is None:
+                    await q.answer(T(lang, "insufficient_balance"), show_alert=True)
+                    return
+
+                await s.flush()
+                new_generation_id = gen_obj.id
+
+            # Show processing message
+            await q.message.answer(T(lang, "processing_generation"))
+            await q.answer()
+
+            # Submit task to Seedream
+            try:
+                async with db.session() as s:
+                    original_gen_refresh = (
+                        await s.execute(select(Generation).where(Generation.id == generation_id))
+                    ).scalar_one_or_none()
+
+                    params = original_gen_refresh.params or {}
+                    aspect = params.get("aspect", "3_4")
+                    image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
+
+                    task_id = await asyncio.to_thread(
+                        seedream.create_task,
+                        prompt=original_gen_refresh.prompt,
+                        image_url=original_gen_refresh.source_image_urls[0] if original_gen_refresh.source_image_urls else None,
+                        image_size=image_size,
+                        image_resolution=image_resolution,
+                    )
+
+                    # Update generation status
+                    gen_db = (
+                        await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                    ).scalar_one_or_none()
+                    if gen_db:
+                        gen_db.external_id = task_id
+                        gen_db.status = GenerationStatus.running
+
+            except Exception as e:
+                # Refund credits on task creation failure
+                async with db.session() as s:
+                    gen_db = (
+                        await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                    ).scalar_one_or_none()
+                    user_db = (
+                        await s.execute(select(User).where(User.user_id == q.from_user.id))
+                    ).scalar_one_or_none()
+
+                    if gen_db:
+                        gen_db.status = GenerationStatus.failed
+                        gen_db.error_message = f"Task creation failed: {str(e)}"
+                        gen_db.finished_at = datetime.now(timezone.utc)
+                    if user_db and gen_db:
+                        user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
+                logger.exception("Seedream create_task failed (redo single)", exc_info=e)
+                await q.message.answer(T(lang, "generation_failed"))
+                return
+
+            # Poll for results
+            max_retries = 3
+            retry_count = 0
+            last_error = None
+            result_urls = None
+
+            while retry_count < max_retries:
+                try:
+                    result_urls = await asyncio.to_thread(seedream.poll_task, task_id)
+                    if result_urls:
+                        break
+                except Exception as e:
+                    last_error = e
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        await asyncio.sleep(2 ** retry_count)
+
+            if not result_urls:
+                # All retries failed - refund credits
+                async with db.session() as s:
+                    gen_db = (
+                        await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                    ).scalar_one_or_none()
+                    user_db = (
+                        await s.execute(select(User).where(User.user_id == q.from_user.id))
+                    ).scalar_one_or_none()
+
+                    if gen_db:
+                        gen_db.status = GenerationStatus.failed
+                        gen_db.error_message = f"All retries failed: {str(last_error)}"
+                        gen_db.finished_at = datetime.now(timezone.utc)
+                    if user_db and gen_db:
+                        user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
+                logger.error("Seedream poll_task failed after all retries (redo single)", extra={"error": repr(last_error)})
+                await q.message.answer(T(lang, "generation_failed"))
+                return
+
+            # Download new image
+            try:
+                download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+                img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+            except Exception as e:
+                logger.exception("Failed to download regenerated image (redo single)", exc_info=e)
+                await q.message.answer(T(lang, "generation_failed"))
+                return
+
+            # Update generation status
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.status = GenerationStatus.succeeded
+                    gen_db.images_generated = 1
+                    gen_db.finished_at = datetime.now(timezone.utc)
+
+                # Save to database
+                img = GeneratedImage(
+                    generation_id=new_generation_id,
+                    telegram_file_id=None,
+                    source_url=result_urls[0],
+                    role=ImageRole.base,
+                )
+                s.add(img)
+
+            # Replace photo in review list
+            photos[0] = {
+                "url": result_urls[0],
+                "bytes": img_bytes,
+                "generation_id": new_generation_id,
+                "background": photo.get("background"),
+                "hair": photo.get("hair"),
+                "style": photo.get("style"),
+                "aspect": photo.get("aspect"),
+            }
+            await state.update_data(review_photos=photos)
+
+            # Return to review state and show the new photo
+            await state.set_state(GenerationFlow.reviewing_photos)
+            await _show_photo_for_review(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data == "gen:topup")
+    async def on_topup_from_review(q: CallbackQuery):
+        """Handle topup request from review."""
+        lang = await get_lang(q, db)
+        await q.message.answer(T(lang, "no_credits"))
+        await q.answer()
 
 
     # --- payments flow ---
