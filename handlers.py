@@ -2886,7 +2886,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 task_id = await asyncio.to_thread(
                     seedream.create_task,
                     prompt=original_gen_refresh.prompt,
-                    image_url=original_gen_refresh.source_image_urls[0] if original_gen_refresh.source_image_urls else None,
+                    image_urls=original_gen_refresh.source_image_urls if original_gen_refresh.source_image_urls else None,
                     image_size=image_size,
                     image_resolution=image_resolution,
                 )
@@ -2918,6 +2918,12 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
             logger.exception("Seedream create_task failed (redo)", exc_info=e)
             await q.message.answer(T(lang, "generation_failed"))
+
+            # Move to next photo (fault tolerance)
+            data = await state.get_data()
+            current_idx = data.get("current_photo_index", 0)
+            await state.update_data(current_photo_index=current_idx + 1)
+            await _show_photo_for_review(q.message, state, lang, db)
             return
 
         # Poll for results (with retry logic)
@@ -2956,6 +2962,12 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
             logger.error("Seedream poll_task failed after all retries (redo)", extra={"error": repr(last_error)})
             await q.message.answer(T(lang, "generation_failed"))
+
+            # Move to next photo (fault tolerance)
+            data = await state.get_data()
+            current_idx = data.get("current_photo_index", 0)
+            await state.update_data(current_photo_index=current_idx + 1)
+            await _show_photo_for_review(q.message, state, lang, db)
             return
 
         # Download new image
@@ -2965,6 +2977,12 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         except Exception as e:
             logger.exception("Failed to download regenerated image", exc_info=e)
             await q.message.answer(T(lang, "generation_failed"))
+
+            # Move to next photo (fault tolerance)
+            data = await state.get_data()
+            current_idx = data.get("current_photo_index", 0)
+            await state.update_data(current_photo_index=current_idx + 1)
+            await _show_photo_for_review(q.message, state, lang, db)
             return
 
         # Update generation status to succeeded
@@ -3161,7 +3179,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                     task_id = await asyncio.to_thread(
                         seedream.create_task,
                         prompt=original_gen_refresh.prompt,
-                        image_url=original_gen_refresh.source_image_urls[0] if original_gen_refresh.source_image_urls else None,
+                        image_urls=original_gen_refresh.source_image_urls if original_gen_refresh.source_image_urls else None,
                         image_size=image_size,
                         image_resolution=image_resolution,
                     )
