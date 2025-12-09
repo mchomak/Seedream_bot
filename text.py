@@ -274,6 +274,16 @@ phrases = {
         "gender_selected_stub": (
             "Пол модели сохранён. На следующем шаге будет выбор цвета волос, возраста, стиля и соотношения сторон."
         ),
+        "multi_items_intro": (
+            "Вы загрузили {count} вещей.\n\n"
+            "Далее вы сможете выбрать фон, пол, возраст и цвет волос модели, "
+            "соотношение сторон и стиль фото на выходе.\n\n"
+            "Что вам удобнее?"
+            ),
+
+        "btn_mode_all_items": "Задать единые настройки для всех вещей (быстрее)",
+        "btn_mode_per_item": "Задать настройки для каждой вещи отдельно",
+
     },
 
     "en": {
@@ -287,6 +297,16 @@ phrases = {
             "and top up balance with Telegram Stars."
         ),
         "help_header": "Available commands",
+        "multi_items_intro": (
+            "You have uploaded {count} items.\n\n"
+            "Next you will choose background, model gender, age, hair color, "
+            "photo style and aspect ratio for the images.\n\n"
+            "How would you like to proceed?"
+        ),
+
+        "btn_mode_all_items": "Use the same settings for all items (faster)",
+        "btn_mode_per_item": "Set settings for each item separately",
+
 
         # --- command descriptions ---
         "help_items": {
