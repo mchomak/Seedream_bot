@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Optional, Any
-
+from decimal import Decimal
 from aiogram import Router, F, Bot
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -40,16 +40,17 @@ import json
 from io import BytesIO
 
 # Import helper functions from modular structure
-from handlers.i18n_helpers import get_lang, T, T_item, install_bot_commands
-from handlers.db_helpers import Profile, get_profile, ensure_credits_and_create_generation
-from handlers.keyboards import (
+from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands
+from handlers_func.db_helpers import Profile, get_profile, ensure_credits_and_create_generation
+from handlers_func.keyboards import (
     build_lang_kb as _build_lang_kb,
     build_background_keyboard,
     build_hair_keyboard,
     build_style_keyboard,
     build_aspect_keyboard,
 )
-
+from text import phrases
+from handlers_func.keyboards import _lang_display_name
 
 # ---------- payments (Stars) ----------
 class StarsPay:
