@@ -2584,43 +2584,284 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 )
                 s.add(img)
 
-        # --- 14. отправляем пользователю все картинки и связываем с telegram_file_id ---
+        # --- 14. Initialize photo review workflow ---
+        # Store all photos in state for interactive review
+        await state.update_data(
+            review_photos=image_records,  # All generated photos
+            current_photo_index=0,  # Index of currently displayed photo
+            approved_photos=[],  # List of approved photo indices
+            rejected_photos=[],  # List of rejected photo indices
+        )
+
+        # Set state to reviewing_photos
+        await state.set_state(GenerationFlow.reviewing_photos)
+
+        # Show first photo with approval buttons
+        await _show_photo_for_review(q.message, state, lang, db)
+
+
+    # --- Photo review helper function ---
+    async def _show_photo_for_review(message: Message, state: FSMContext, lang: str, db: Database):
+        """Show current photo with approval buttons."""
         from aiogram.types import BufferedInputFile
 
-        sent_messages: list[tuple[str, Any]] = []
+        data = await state.get_data()
+        photos = data.get("review_photos", [])
+        current_idx = data.get("current_photo_index", 0)
+        approved = data.get("approved_photos", [])
 
-        for idx, rec in enumerate(image_records, start=1):
-            caption = T(lang, "generation_done") if idx == 1 else None
-            msg = await q.message.answer_photo(
-                photo=BufferedInputFile(
-                    rec["bytes"], filename=f"seedream_initial_{idx}.png"
-                ),
-                caption=caption,
+        if current_idx >= len(photos):
+            # No more photos to review
+            if approved:
+                # Has approved photos - move to new angles/poses stage (stub)
+                await message.answer(T(lang, "all_photos_reviewed", approved=len(approved)))
+                await message.answer(T(lang, "moving_to_angles"))
+                await state.set_state(GenerationFlow.new_angles_poses)
+            else:
+                # No approved photos - show redo dialog
+                await message.answer(T(lang, "no_more_photos"))
+            return
+
+        # Get current photo
+        photo = photos[current_idx]
+        total = len(photos)
+        caption = f"{T(lang, 'photo_review_title', current=current_idx + 1, total=total)}\n\n{T(lang, 'photo_review_question')}"
+
+        # Send as uncompressed document for original quality
+        doc_msg = await message.answer_document(
+            document=BufferedInputFile(
+                photo["bytes"],
+                filename=f"generation_{current_idx + 1}.png"
+            ),
+            caption=caption,
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_approve"),
+                            callback_data=f"review:approve:{current_idx}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_redo"),
+                            callback_data=f"review:redo:{current_idx}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_reject"),
+                            callback_data=f"review:reject:{current_idx}"
+                        )
+                    ],
+                ]
             )
-            sent_messages.append((rec["url"], msg))
+        )
 
-        async with db.session() as s:
-            for url, msg in sent_messages:
-                if not msg.photo:
-                    continue
-                tele_file_id = msg.photo[-1].file_id
-                img_db: Optional[GeneratedImage] = (
+        # Store document file_id for later use
+        if doc_msg.document:
+            async with db.session() as s:
+                img_db = (
                     await s.execute(
                         select(GeneratedImage).where(
-                            GeneratedImage.user_id == q.from_user.id,
-                            GeneratedImage.storage_url == url,
+                            GeneratedImage.user_id == message.from_user.id,
+                            GeneratedImage.storage_url == photo["url"],
                         )
                     )
                 ).scalar_one_or_none()
                 if img_db:
-                    img_db.telegram_file_id = tele_file_id
+                    img_db.telegram_file_id = doc_msg.document.file_id
 
-        await state.clear()
 
+    # --- Photo review handlers ---
+    @r.callback_query(F.data.startswith("review:approve:"))
+    async def on_photo_approve(q: CallbackQuery, state: FSMContext):
+        """Handle photo approval."""
+        lang = await get_lang(q, db)
+        current = await state.get_state()
+
+        if current != GenerationFlow.reviewing_photos.state:
+            await q.answer()
+            return
+
+        # Get photo index from callback data
+        photo_idx = int(q.data.split(":")[-1])
+
+        # Update state
+        data = await state.get_data()
+        approved = data.get("approved_photos", [])
+        if photo_idx not in approved:
+            approved.append(photo_idx)
+
+        await state.update_data(
+            approved_photos=approved,
+            current_photo_index=photo_idx + 1
+        )
+
+        await q.answer(T(lang, "photo_approved"))
+
+        # Delete the current message
         try:
-            await q.message.edit_text(T(lang, "generation_done"))
+            await q.message.delete()
         except Exception:
             pass
+
+        # Show next photo
+        await _show_photo_for_review(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data.startswith("review:reject:"))
+    async def on_photo_reject(q: CallbackQuery, state: FSMContext):
+        """Handle photo rejection."""
+        lang = await get_lang(q, db)
+        current = await state.get_state()
+
+        if current != GenerationFlow.reviewing_photos.state:
+            await q.answer()
+            return
+
+        photo_idx = int(q.data.split(":")[-1])
+
+        # Update state
+        data = await state.get_data()
+        rejected = data.get("rejected_photos", [])
+        if photo_idx not in rejected:
+            rejected.append(photo_idx)
+
+        photos = data.get("review_photos", [])
+        approved = data.get("approved_photos", [])
+
+        await state.update_data(
+            rejected_photos=rejected,
+            current_photo_index=photo_idx + 1
+        )
+
+        await q.answer(T(lang, "photo_rejected"))
+
+        # Delete the current message
+        try:
+            await q.message.delete()
+        except Exception:
+            pass
+
+        # Check if this was the only photo and there are no approved ones
+        if len(photos) == 1 and not approved:
+            # Show redo dialog for single photo
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_redo_same"),
+                            callback_data="review:redo_single:same"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_redo_new"),
+                            callback_data="review:redo_single:new"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_return_menu"),
+                            callback_data="gen:back_to_start"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_topup_balance"),
+                            callback_data="gen:topup"
+                        )
+                    ],
+                ]
+            )
+            await q.message.answer(T(lang, "redo_question"), reply_markup=kb)
+        else:
+            # Show next photo
+            await _show_photo_for_review(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data.startswith("review:redo:"))
+    async def on_photo_redo(q: CallbackQuery, state: FSMContext):
+        """Handle photo redo request."""
+        lang = await get_lang(q, db)
+        current = await state.get_state()
+
+        if current != GenerationFlow.reviewing_photos.state:
+            await q.answer()
+            return
+
+        photo_idx = int(q.data.split(":")[-1])
+
+        # Check if user has enough credits (1 credit per generation)
+        async with db.session() as s:
+            user_db = (
+                await s.execute(select(User).where(User.user_id == q.from_user.id))
+            ).scalar_one_or_none()
+
+            if not user_db or (user_db.credits_balance or 0) < 1:
+                # Insufficient balance
+                kb = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [
+                            InlineKeyboardButton(
+                                text=T(lang, "btn_topup_balance"),
+                                callback_data="gen:topup"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                text=T(lang, "btn_back"),
+                                callback_data="review:back_to_review"
+                            )
+                        ],
+                    ]
+                )
+                await q.answer(T(lang, "insufficient_balance"), show_alert=True)
+                await q.message.answer(T(lang, "insufficient_balance"), reply_markup=kb)
+                return
+
+        # TODO: Implement actual regeneration logic here
+        # For now, just show a message
+        await q.answer("Функция повторной генерации скоро будет реализована", show_alert=True)
+
+
+    @r.callback_query(F.data == "review:back_to_review")
+    async def on_back_to_review(q: CallbackQuery, state: FSMContext):
+        """Return to photo review."""
+        lang = await get_lang(q, db)
+        try:
+            await q.message.delete()
+        except Exception:
+            pass
+        await _show_photo_for_review(q.message, state, lang, db)
+        await q.answer()
+
+
+    @r.callback_query(F.data.startswith("review:redo_single:"))
+    async def on_single_photo_redo(q: CallbackQuery, state: FSMContext):
+        """Handle redo for single photo batch."""
+        lang = await get_lang(q, db)
+        action = q.data.split(":")[-1]
+
+        if action == "new":
+            # Return to design stage (step 3)
+            await state.clear()
+            await q.message.answer(T(lang, "start_generation"))
+            # TODO: Redirect to generation start
+            await q.answer()
+        elif action == "same":
+            # Redo with same settings
+            # TODO: Implement regeneration with same settings
+            await q.answer("Функция повторной генерации скоро будет реализована", show_alert=True)
+
+
+    @r.callback_query(F.data == "gen:topup")
+    async def on_topup_from_review(q: CallbackQuery):
+        """Handle topup request from review."""
+        lang = await get_lang(q, db)
+        await q.message.answer(T(lang, "no_credits"))
+        await q.answer()
 
 
     # --- payments flow ---
