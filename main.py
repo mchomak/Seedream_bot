@@ -10,7 +10,8 @@ from aiogram.client.default import DefaultBotProperties
 from config import load_env, get_runtime_env, Settings
 from db import Database
 from fsm import create_fsm_storage
-from handlers import build_router, install_bot_commands
+from handlers_func import install_bot_commands
+from handlers import build_router
 from setup_redis import build_fsm_diag_router
 from setup_log import (
     setup_logging,
