@@ -705,13 +705,15 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
             idx = 0
             file_id = cloth_file_ids[idx]
+            photo_msg_id = None
             try:
-                await query.message.answer_document(
+                photo_msg = await query.message.answer_document(
                     file_id,
                     caption=T(lang, "per_item_photo_caption", idx=idx + 1, total=num_items)
                     if T(lang, "per_item_photo_caption", idx=1, total=1) != "per_item_photo_caption"
                     else f"Фото {idx+1}/{num_items}"
                 )
+                photo_msg_id = photo_msg.message_id
             except Exception:
                 # если не удалось отправить как документ, игнорируем картинку и просто пойдём к настройкам
                 pass
@@ -727,6 +729,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             await state.update_data(
                 generate_prompt_msg_id=sent.message_id,
                 generate_chat_id=sent.chat.id,
+                per_item_photo_msg_id=photo_msg_id,
             )
             await state.set_state(GenerationFlow.choosing_background)
             await query.answer()
@@ -1163,8 +1166,8 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             try:
                 await message.bot.delete_message(chat_id=prev_prompt_chat, message_id=prev_prompt_id)
                 await state.update_data(generate_prompt_msg_id=None, generate_chat_id=None)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to delete background selection message: {e}")
         text = (
             T(lang, "multi_items_intro", count=num_items)
             or (
@@ -2102,12 +2105,31 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 next_idx = idx + 1
                 if next_idx < num_items:
                     await state.update_data(per_item_index=next_idx)
-                    # показать следующее фото и выбор фона
+
+                    # Delete previous item's photo and configuration messages
+                    prev_photo_msg_id = data.get("per_item_photo_msg_id")
+                    prev_config_msg_id = data.get("generate_prompt_msg_id")
+                    prev_chat_id = data.get("generate_chat_id")
+
+                    if prev_photo_msg_id and prev_chat_id:
+                        try:
+                            await q.bot.delete_message(chat_id=prev_chat_id, message_id=prev_photo_msg_id)
+                        except Exception as e:
+                            logger.warning(f"Failed to delete previous item photo: {e}")
+
+                    if prev_config_msg_id and prev_chat_id:
+                        try:
+                            await q.bot.delete_message(chat_id=prev_chat_id, message_id=prev_config_msg_id)
+                        except Exception as e:
+                            logger.warning(f"Failed to delete previous config message: {e}")
+
+                    # Show next item photo
                     cloth_file_ids = list(data.get("cloth_file_ids") or [])
+                    photo_msg_id = None
                     if next_idx < len(cloth_file_ids):
                         file_id = cloth_file_ids[next_idx]
                         try:
-                            await q.message.answer_document(
+                            photo_msg = await q.message.answer_document(
                                 file_id,
                                 caption=(
                                     T(lang, "per_item_photo_caption", idx=next_idx + 1, total=num_items)
@@ -2115,23 +2137,24 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                                     else f"Фото {next_idx+1}/{num_items}"
                                 ),
                             )
-                        except Exception:
-                            pass
+                            photo_msg_id = photo_msg.message_id
+                        except Exception as e:
+                            logger.warning(f"Failed to send next item photo: {e}")
 
+                    # Show configuration screen for next item
                     intro_text = (
                         T(lang, "per_item_intro", idx=next_idx + 1, total=num_items)
                         if T(lang, "per_item_intro", idx=1, total=1) != "per_item_intro"
                         else T(lang, "background_select_single")
                     )
                     kb = build_background_keyboard(lang, set())
-                    try:
-                        await q.message.edit_text(intro_text, reply_markup=kb)
-                    except Exception:
-                        sent = await q.message.answer(intro_text, reply_markup=kb)
-                        await state.update_data(
-                            generate_prompt_msg_id=sent.message_id,
-                            generate_chat_id=sent.chat.id,
-                        )
+                    sent = await q.message.answer(intro_text, reply_markup=kb)
+
+                    await state.update_data(
+                        generate_prompt_msg_id=sent.message_id,
+                        generate_chat_id=sent.chat.id,
+                        per_item_photo_msg_id=photo_msg_id,
+                    )
 
                     await state.set_state(GenerationFlow.choosing_background)
                     await q.answer()
