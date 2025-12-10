@@ -1,6 +1,6 @@
 # handlers.py
 from __future__ import annotations
-
+from aiogram.types import BufferedInputFile
 from datetime import datetime, timezone
 from typing import Optional, Any
 from decimal import Decimal
@@ -2604,7 +2604,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     # --- Photo review helper function ---
     async def _show_photo_for_review(message: Message, state: FSMContext, lang: str, db: Database):
         """Show current photo with approval buttons."""
-        from aiogram.types import BufferedInputFile
+        
 
         data = await state.get_data()
         photos = data.get("review_photos", [])
@@ -3939,7 +3939,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
 
     @r.message(GenerationFlow.waiting_rear_photo, F.document)
-    async def on_rear_photo_upload(m: Message, state: FSMContext):
+    async def on_rear_photo_upload(m: Message, state: FSMContext, bot: Bot):
         """Handle rear photo upload for rear view generation."""
         lang = await get_lang(m, db)
 
