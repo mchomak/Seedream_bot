@@ -73,7 +73,10 @@ class GenerationFlow(StatesGroup):
     choosing_aspect = State()
     confirming = State()
     reviewing_photos = State()  # Interactive photo approval
-    new_angles_poses = State()  # Stub for future implementation
+    new_angles_poses = State()  # Deprecated - kept for compatibility
+    angles_poses_menu = State()  # Main menu for angles/poses selection
+    waiting_rear_photo = State()  # Waiting for rear view photo upload
+    confirm_finish_photo = State()  # Confirming finish with current photo
 
 
 # ---------- payment meta ----------
