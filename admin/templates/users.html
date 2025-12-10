@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Users - Seedream Admin{% endblock %}
+{% block heading %}Users Management{% endblock %}
+
+{% block content %}
+<!-- Search and Stats -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <form method="get" action="/admin/users">
+            <div class="input-group">
+                <input type="text" class="form-control" name="search" placeholder="Search by ID or username..." value="{{ search }}">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
+            </div>
+        </form>
+    </div>
+    <div class="col-md-6 text-end">
+        <span class="badge bg-secondary fs-6">Total: {{ total_users }}</span>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Telegram ID</th>
+                        <th>Username</th>
+                        <th>Credits Balance</th>
+                        <th>Language</th>
+                        <th>Joined</th>
+                        <th>Last Seen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td><code>{{ user.user_id }}</code></td>
+                        <td>
+                            {% if user.tg_username %}
+                            <a href="https://t.me/{{ user.tg_username }}" target="_blank">@{{ user.tg_username }}</a>
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if (user.credits_balance or 0) > 0 %}success{% else %}secondary{% endif %}">
+                                {{ user.credits_balance or 0 }}
+                            </span>
+                        </td>
+                        <td>{{ user.lang or 'N/A' }}</td>
+                        <td><small>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</small></td>
+                        <td><small>{{ user.last_seen_at.strftime('%Y-%m-%d %H:%M') if user.last_seen_at else 'Never' }}</small></td>
+                        <td>
+                            <a href="/admin/users/{{ user.id }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-5">
+                            <i class="fas fa-users fa-3x mb-3 d-block"></i>
+                            No users found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="card-footer bg-white">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}">Previous</a>
+                </li>
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == page %}
+                        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                    {% elif p <= 3 or p > total_pages - 3 or (p >= page - 2 and p <= page + 2) %}
+                        <li class="page-item"><a class="page-link" href="?page={{ p }}{% if search %}&search={{ search }}{% endif %}">{{ p }}</a></li>
+                    {% elif p == 4 or p == total_pages - 3 %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}">Next</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
