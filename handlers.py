@@ -48,6 +48,7 @@ from handlers.keyboards import (
     build_hair_keyboard,
     build_style_keyboard,
     build_aspect_keyboard,
+    build_main_keyboard,
 )
 
 
@@ -189,7 +190,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
     # --- /start ---
     @r.message(Command("start"))
-    async def cmd_start(m: Message):
+    async def cmd_start(m: Message, state: FSMContext):
         async with db.session() as s:
             await upsert_user_basic(
                 s,
@@ -201,7 +202,11 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 is_bot=m.from_user.is_bot,
             )
         lang = await get_lang(m, db)
-        await m.answer(f"<b>{T(lang, 'start_title')}</b>\n{T(lang, 'start_desc')}")
+        await state.clear()  # Clear any existing state
+        await m.answer(
+            f"<b>{T(lang, 'start_title')}</b>\n{T(lang, 'start_desc')}",
+            reply_markup=build_main_keyboard(lang)
+        )
 
     # --- /help ---
 
@@ -214,55 +219,319 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             lines.append(f"/{cmd} — {desc}")
         await m.answer("\n".join(lines))
 
-    # --- /profile ---
+    # --- /profile (now Account Menu) ---
+
+    async def _show_account_menu(message: Message, lang: str):
+        """Show the account menu with Balance and History buttons."""
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_balance"), callback_data="account:balance")],
+                [InlineKeyboardButton(text=T(lang, "btn_history"), callback_data="account:history:0")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:back")],
+            ]
+        )
+        await message.answer(T(lang, "account_menu"), reply_markup=kb)
 
     @r.message(Command("profile"))
     async def cmd_profile(m: Message):
         lang = await get_lang(m, db)
+        await _show_account_menu(m, lang)
+
+    # Handle keyboard button presses
+    @r.message(F.text.in_([phrases["ru"]["kb_my_account"], phrases["en"]["kb_my_account"]]))
+    async def on_my_account_button(m: Message):
+        lang = await get_lang(m, db)
+        await _show_account_menu(m, lang)
+
+    @r.message(F.text.in_([phrases["ru"]["kb_generation"], phrases["en"]["kb_generation"]]))
+    async def on_generation_button(m: Message, state: FSMContext):
+        # Redirect to /generate command
+        await cmd_generate(m, state)
+
+    @r.message(F.text.in_([phrases["ru"]["kb_examples"], phrases["en"]["kb_examples"]]))
+    async def on_examples_button(m: Message):
+        # Redirect to /examples command
+        await cmd_examples(m)
+
+    # Account menu callbacks
+    @r.callback_query(F.data == "account:back")
+    async def on_account_back(q: CallbackQuery):
+        await q.message.delete()
+        await q.answer()
+
+    @r.callback_query(F.data == "account:balance")
+    async def on_account_balance(q: CallbackQuery):
+        """Show balance view."""
+        lang = await get_lang(q, db)
+
         async with db.session() as s:
-            prof = await get_profile(s, tg_user_id=m.from_user.id)
+            prof = await get_profile(s, tg_user_id=q.from_user.id)
 
         if not prof.user:
-            await m.answer(T(lang, "profile_not_found"))
+            await q.answer(T(lang, "profile_not_found"), show_alert=True)
             return
 
-        u = prof.user
-        text = "\n".join(
-            [
-                f"<b>{T(lang, 'profile_title')}</b>",
-                T(lang, "profile_line_id", user_id=u.user_id),
-                T(lang, "profile_line_user", username=u.tg_username or "-"),
-                T(lang, "profile_line_lang", lang=u.lang or "-"),
-                T(
-                    lang,
-                    "profile_line_created",
-                    created=str(u.created_at) if u.created_at else "-",
-                ),
-                T(
-                    lang,
-                    "profile_line_last_seen",
-                    last_seen=str(u.last_seen_at) if u.last_seen_at else "-",
-                ),
-                T(
-                    lang,
-                    "profile_line_txn",
-                    count=prof.txn_count,
-                    sum=prof.txn_sum,
-                    cur=prof.currency,
-                ),
-                T(
-                    lang,
-                    "profile_line_balance_credits",
-                    balance=prof.credits_balance,
-                ),
-                T(
-                    lang,
-                    "profile_line_balance_money",
-                    balance=prof.money_balance,
-                ),
+        # Assuming 1 generation = 10 rubles (you can adjust this)
+        PRICE_PER_GEN = 10
+
+        text = (
+            f"{T(lang, 'balance_title')}\n\n"
+            f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
+            f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
+            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
+        )
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_topup"), callback_data="account:topup")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")],
             ]
         )
-        await m.answer(text)
+
+        try:
+            await q.message.edit_text(text, reply_markup=kb)
+        except Exception:
+            await q.message.answer(text, reply_markup=kb)
+        await q.answer()
+
+    @r.callback_query(F.data == "account:topup")
+    async def on_account_topup(q: CallbackQuery):
+        """Handle top-up request."""
+        lang = await get_lang(q, db)
+        await q.message.answer(T(lang, "no_credits"))
+        await q.answer()
+
+    @r.callback_query(F.data == "account:menu")
+    async def on_account_menu(q: CallbackQuery):
+        """Return to account menu."""
+        lang = await get_lang(q, db)
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_balance"), callback_data="account:balance")],
+                [InlineKeyboardButton(text=T(lang, "btn_history"), callback_data="account:history:0")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:back")],
+            ]
+        )
+
+        try:
+            await q.message.edit_text(T(lang, "account_menu"), reply_markup=kb)
+        except Exception:
+            await q.message.answer(T(lang, "account_menu"), reply_markup=kb)
+        await q.answer()
+
+    @r.callback_query(F.data.startswith("account:history:"))
+    async def on_account_history(q: CallbackQuery):
+        """Show generation history with pagination."""
+        lang = await get_lang(q, db)
+
+        # Parse page number
+        page = int(q.data.split(":")[-1])
+
+        # Get history from database (last month)
+        from datetime import timedelta
+        one_month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+
+        async with db.session() as s:
+            # Get successful generations from last month
+            stmt = (
+                select(Generation)
+                .where(Generation.user_id == q.from_user.id)
+                .where(Generation.status == GenerationStatus.succeeded)
+                .where(Generation.finished_at >= one_month_ago)
+                .order_by(Generation.finished_at.desc())
+            )
+            result = await s.execute(stmt)
+            all_gens = result.scalars().all()
+
+        if not all_gens:
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")],
+                ]
+            )
+            try:
+                await q.message.edit_text(
+                    f"{T(lang, 'history_title')}\n\n{T(lang, 'history_empty')}",
+                    reply_markup=kb
+                )
+            except Exception:
+                await q.message.answer(
+                    f"{T(lang, 'history_title')}\n\n{T(lang, 'history_empty')}",
+                    reply_markup=kb
+                )
+            await q.answer()
+            return
+
+        # Pagination
+        ITEMS_PER_PAGE = 5
+        total_pages = (len(all_gens) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+        page = max(0, min(page, total_pages - 1))
+
+        start_idx = page * ITEMS_PER_PAGE
+        end_idx = start_idx + ITEMS_PER_PAGE
+        page_gens = all_gens[start_idx:end_idx]
+
+        # Build history text
+        lines = [T(lang, "history_title"), ""]
+
+        for gen in page_gens:
+            date_str = gen.finished_at.strftime("%Y-%m-%d") if gen.finished_at else "N/A"
+            time_str = gen.finished_at.strftime("%H:%M:%S") if gen.finished_at else "N/A"
+
+            # Format parameters
+            params_dict = gen.params or {}
+            params_str = f"bg={params_dict.get('background', 'N/A')}, style={params_dict.get('style', 'N/A')}"
+
+            item_text = T(
+                lang,
+                "history_item",
+                date=date_str,
+                time=time_str,
+                cost=gen.credits_spent or 1,
+                params=params_str,
+                images_count=gen.images_generated or 0,
+            )
+            lines.append(item_text)
+
+            # Add buttons for this generation
+            lines.append("")  # Spacing
+
+        lines.append(f"\n{T(lang, 'history_page', page=page + 1, total=total_pages)}")
+        lines.append(T(lang, "history_month_limit"))
+
+        text = "\n".join(lines)
+
+        # Build keyboard with pagination and download buttons
+        kb_rows = []
+
+        # Add download/use buttons for each generation on this page
+        for i, gen in enumerate(page_gens):
+            row = [
+                InlineKeyboardButton(
+                    text=f"{T(lang, 'btn_download')} #{start_idx + i + 1}",
+                    callback_data=f"hist:download:{gen.id}"
+                ),
+                InlineKeyboardButton(
+                    text=f"{T(lang, 'btn_use_as_base')} #{start_idx + i + 1}",
+                    callback_data=f"hist:use_base:{gen.id}"
+                ),
+            ]
+            kb_rows.append(row)
+
+        # Pagination buttons
+        nav_row = []
+        if page > 0:
+            nav_row.append(
+                InlineKeyboardButton(text=T(lang, "btn_prev_page"), callback_data=f"account:history:{page - 1}")
+            )
+        if page < total_pages - 1:
+            nav_row.append(
+                InlineKeyboardButton(text=T(lang, "btn_next_page"), callback_data=f"account:history:{page + 1}")
+            )
+        if nav_row:
+            kb_rows.append(nav_row)
+
+        # Back button
+        kb_rows.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
+
+        kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+
+        try:
+            await q.message.edit_text(text, reply_markup=kb)
+        except Exception:
+            await q.message.answer(text, reply_markup=kb)
+        await q.answer()
+
+    @r.callback_query(F.data.startswith("hist:download:"))
+    async def on_history_download(q: CallbackQuery):
+        """Download images from a generation."""
+        lang = await get_lang(q, db)
+        gen_id = int(q.data.split(":")[-1])
+
+        async with db.session() as s:
+            # Get generation and its images
+            gen = (await s.execute(select(Generation).where(Generation.id == gen_id))).scalar_one_or_none()
+
+            if not gen or gen.user_id != q.from_user.id:
+                await q.answer("Generation not found", show_alert=True)
+                return
+
+            # Get images
+            images = (
+                await s.execute(
+                    select(GeneratedImage).where(GeneratedImage.generation_id == gen_id)
+                )
+            ).scalars().all()
+
+        if not images:
+            await q.answer("No images found", show_alert=True)
+            return
+
+        await q.answer("Downloading...")
+
+        # Download and send images
+        for i, img in enumerate(images):
+            try:
+                # Download from storage_url
+                img_bytes = await asyncio.to_thread(seedream.download_file_bytes, img.storage_url)
+
+                # Send as document
+                from aiogram.types import BufferedInputFile
+                await q.message.answer_document(
+                    document=BufferedInputFile(img_bytes, filename=f"generation_{gen_id}_{i + 1}.png"),
+                    caption=f"Generation #{gen_id} - Image {i + 1}/{len(images)}"
+                )
+            except Exception as e:
+                logger.exception(f"Failed to download image {img.id}", exc_info=e)
+
+    @r.callback_query(F.data.startswith("hist:use_base:"))
+    async def on_history_use_as_base(q: CallbackQuery, state: FSMContext):
+        """Use a historical generation as base for angles/poses stage."""
+        lang = await get_lang(q, db)
+        gen_id = int(q.data.split(":")[-1])
+
+        async with db.session() as s:
+            # Get generation and its images
+            gen = (await s.execute(select(Generation).where(Generation.id == gen_id))).scalar_one_or_none()
+
+            if not gen or gen.user_id != q.from_user.id:
+                await q.answer("Generation not found", show_alert=True)
+                return
+
+            # Get images
+            images = (
+                await s.execute(
+                    select(GeneratedImage).where(GeneratedImage.generation_id == gen_id)
+                )
+            ).scalars().all()
+
+        if not images:
+            await q.answer("No images found", show_alert=True)
+            return
+
+        # Download image bytes for state
+        img_bytes = await asyncio.to_thread(seedream.download_file_bytes, images[0].storage_url)
+
+        # Initialize angles/poses stage with this as base photo
+        base_photo = {
+            "url": images[0].storage_url,
+            "bytes": img_bytes,
+            "generation_id": gen_id,
+            "background": (gen.params or {}).get("background", "white"),
+            "hair": (gen.params or {}).get("hair", "any"),
+            "style": (gen.params or {}).get("style", "casual"),
+            "aspect": (gen.params or {}).get("aspect", "3_4"),
+        }
+
+        await state.update_data(
+            base_photos=[base_photo],
+            current_base_index=0,
+        )
+        await state.set_state(GenerationFlow.angles_poses_menu)
+
+        await q.answer("Starting angles/poses stage...")
+        await _show_angles_poses_menu(q.message, state, lang, db)
 
     # --- /buy (пополнение звездами) ---
 
