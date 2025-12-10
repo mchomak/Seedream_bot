@@ -10,6 +10,7 @@ from .keyboards import (
     build_hair_keyboard,
     build_style_keyboard,
     build_aspect_keyboard,
+    build_main_keyboard
 )
 from .i18n_helpers import get_lang, T, T_item, install_bot_commands
 from .db_helpers import Profile, get_profile, ensure_credits_and_create_generation
