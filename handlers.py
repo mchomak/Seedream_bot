@@ -295,10 +295,17 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         await q.answer()
 
     @r.callback_query(F.data == "account:topup")
-    async def on_account_topup(q: CallbackQuery):
-        """Handle top-up request."""
+    async def on_account_topup(q: CallbackQuery, state: FSMContext):
+        """Handle top-up request - trigger invoice like /buy command."""
         lang = await get_lang(q, db)
-        await q.message.answer(T(lang, "no_credits"))
+        await pay.send_invoice(
+            q.message,
+            state=state,
+            title=T(lang, "invoice_title"),
+            desc=T(lang, "invoice_desc"),
+            stars=1,
+            payload=f"demo:{q.from_user.id}",
+        )
         await q.answer()
 
     @r.callback_query(F.data == "account:menu")
@@ -376,21 +383,55 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         lines = [T(lang, "history_title"), ""]
 
         for gen in page_gens:
-            date_str = gen.finished_at.strftime("%Y-%m-%d") if gen.finished_at else "N/A"
-            time_str = gen.finished_at.strftime("%H:%M:%S") if gen.finished_at else "N/A"
+            # Combine date and time into one line
+            datetime_str = gen.finished_at.strftime("%Y-%m-%d %H:%M:%S") if gen.finished_at else "N/A"
 
-            # Format parameters
+            # Format parameters from JSONB into readable text
             params_dict = gen.params or {}
-            params_str = f"bg={params_dict.get('background', 'N/A')}, style={params_dict.get('style', 'N/A')}"
+            params_parts = []
+
+            # Extract common parameters
+            if "scenario" in params_dict:
+                scenario = params_dict["scenario"]
+                if scenario == "initial_generation":
+                    params_parts.append(f"Scenario: Initial generation")
+                elif scenario == "per_item_generation":
+                    params_parts.append(f"Scenario: Per-item")
+
+            if "action" in params_dict:
+                action = params_dict["action"]
+                action_names = {
+                    "change_pose": "Change pose",
+                    "change_angle": "Change angle",
+                    "rear_view_no_ref": "Rear view",
+                    "rear_view_with_ref": "Rear view (with reference)",
+                    "full_body": "Full body",
+                    "upper_body": "Upper body",
+                    "lower_body": "Lower body",
+                }
+                params_parts.append(action_names.get(action, action))
+
+            if "gender" in params_dict:
+                params_parts.append(f"Gender: {params_dict['gender']}")
+            if "age" in params_dict:
+                params_parts.append(f"Age: {params_dict['age']}")
+            if "background" in params_dict:
+                params_parts.append(f"Background: {params_dict['background']}")
+            if "hair" in params_dict and params_dict["hair"] != "any":
+                params_parts.append(f"Hair: {params_dict['hair']}")
+            if "style" in params_dict:
+                params_parts.append(f"Style: {params_dict['style']}")
+            if "aspect" in params_dict:
+                params_parts.append(f"Aspect: {params_dict['aspect']}")
+
+            params_str = ", ".join(params_parts) if params_parts else "N/A"
 
             item_text = T(
                 lang,
                 "history_item",
-                date=date_str,
-                time=time_str,
+                datetime=datetime_str,
                 cost=gen.credits_spent or 1,
                 params=params_str,
-                images_count=gen.images_generated or 0,
             )
             lines.append(item_text)
 
