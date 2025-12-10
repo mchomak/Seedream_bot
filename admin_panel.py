@@ -47,7 +47,15 @@ app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 
 # Templates and static files
 templates = Jinja2Templates(directory="admin/templates")
-app.mount("/static", StaticFiles(directory="admin/static"), name="static")
+
+# Mount static files only if directory exists
+static_dir = "admin/static"
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+else:
+    # Create directory if it doesn't exist
+    os.makedirs(static_dir, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Database
 db: Optional[Database] = None
