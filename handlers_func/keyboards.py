@@ -1,7 +1,7 @@
 # keyboards.py
 """Keyboard builders for the Telegram bot."""
 
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 from text import phrases
 
 
@@ -219,4 +219,21 @@ def build_aspect_keyboard(lang: str, selected: set[str]) -> InlineKeyboardMarkup
                 )
             ],
         ]
+    )
+
+
+def build_main_keyboard(lang: str) -> ReplyKeyboardMarkup:
+    """Build the persistent main menu keyboard."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(text=T(lang, "kb_generation")),
+                KeyboardButton(text=T(lang, "kb_my_account")),
+            ],
+            [
+                KeyboardButton(text=T(lang, "kb_examples")),
+            ],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
     )
