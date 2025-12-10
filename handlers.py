@@ -3052,9 +3052,10 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             # Save to database
             img = GeneratedImage(
                 generation_id=new_generation_id,
-                telegram_file_id=None,
-                source_url=result_urls[0],
+                user_id=q.from_user.id,
                 role=ImageRole.base,
+                storage_url=result_urls[0],
+                telegram_file_id=None,
             )
             s.add(img)
 
@@ -3380,9 +3381,10 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 # Save to database
                 img = GeneratedImage(
                     generation_id=new_generation_id,
-                    telegram_file_id=None,
-                    source_url=result_urls[0],
+                    user_id=q.from_user.id,
                     role=ImageRole.base,
+                    storage_url=result_urls[0],
+                    telegram_file_id=None,
                 )
                 s.add(img)
 
