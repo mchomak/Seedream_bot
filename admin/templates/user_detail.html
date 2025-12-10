@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}User {{ user.user_id }} - Seedream Admin{% endblock %}
+{% block heading %}User Details{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="/admin/users" class="btn btn-outline-secondary"><i class="fas fa-arrow-left"></i> Back to Users</a>
+</div>
+
+<!-- User Info -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-user"></i> User Information</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted" width="40%">Telegram ID:</td>
+                        <td><code>{{ user.user_id }}</code></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Username:</td>
+                        <td>
+                            {% if user.tg_username %}
+                            <a href="https://t.me/{{ user.tg_username }}" target="_blank">@{{ user.tg_username }}</a>
+                            {% else %}
+                            <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Language:</td>
+                        <td>{{ user.lang or 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Premium:</td>
+                        <td>
+                            {% if user.is_premium %}
+                            <span class="badge bg-success">Yes</span>
+                            {% else %}
+                            <span class="badge bg-secondary">No</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Joined:</td>
+                        <td>{{ user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else 'N/A' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Last Seen:</td>
+                        <td>{{ user.last_seen_at.strftime('%Y-%m-%d %H:%M:%S') if user.last_seen_at else 'Never' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-wallet"></i> Balance</h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <h2 class="display-4 text-success">{{ user.credits_balance or 0 }}</h2>
+                    <p class="text-muted">Credits</p>
+                </div>
+
+                <form method="post" action="/admin/users/{{ user.id }}/adjust-balance">
+                    <div class="mb-3">
+                        <label for="amount" class="form-label">Adjust Amount (+ or -)</label>
+                        <input type="number" class="form-control" id="amount" name="amount" required placeholder="e.g., 100 or -50">
+                    </div>
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Reason</label>
+                        <input type="text" class="form-control" id="reason" name="reason" required placeholder="e.g., Manual top-up">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-coins"></i> Adjust Balance
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="fas fa-dollar-sign"></i> Transactions History</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Amount</th>
+                        <th>Currency</th>
+                        <th>Kind</th>
+                        <th>Status</th>
+                        <th>Provider</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tx in transactions %}
+                    <tr>
+                        <td><small>{{ tx.id }}</small></td>
+                        <td>{{ "%.2f"|format(tx.amount) }}</td>
+                        <td>{{ tx.currency }}</td>
+                        <td><span class="badge bg-info">{{ tx.kind.value }}</span></td>
+                        <td>
+                            <span class="badge bg-{% if tx.status.value == 'succeeded' %}success{% elif tx.status.value == 'pending' %}warning{% else %}danger{% endif %}">
+                                {{ tx.status.value }}
+                            </span>
+                        </td>
+                        <td>{{ tx.provider or 'N/A' }}</td>
+                        <td><small>{{ tx.created_at.strftime('%Y-%m-%d %H:%M') if tx.created_at else 'N/A' }}</small></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="text-center text-muted py-3">No transactions</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Generations -->
+<div class="card">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="fas fa-images"></i> Generations History</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Prompt</th>
+                        <th>Status</th>
+                        <th>Credits</th>
+                        <th>Images</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for gen in generations %}
+                    <tr>
+                        <td><small>{{ gen.id }}</small></td>
+                        <td><small>{{ gen.prompt[:50] if gen.prompt else 'N/A' }}...</small></td>
+                        <td>
+                            <span class="badge bg-{% if gen.status.value == 'succeeded' %}success{% elif gen.status.value == 'running' %}primary{% elif gen.status.value == 'queued' %}info{% else %}danger{% endif %}">
+                                {{ gen.status.value }}
+                            </span>
+                        </td>
+                        <td>{{ gen.credits_spent or 0 }}</td>
+                        <td>{{ gen.images_generated or 0 }}</td>
+                        <td><small>{{ gen.created_at.strftime('%Y-%m-%d %H:%M') if gen.created_at else 'N/A' }}</small></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center text-muted py-3">No generations</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

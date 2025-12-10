@@ -304,6 +304,66 @@ class GeneratedImage(Base):
     )
 
 
+class AdminUser(Base):
+    """Admin panel users for web interface."""
+
+    __tablename__ = "admin_users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String(256), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_superuser: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class AdminActionLog(Base):
+    """Log of admin actions in the panel."""
+
+    __tablename__ = "admin_action_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admin_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    action: Mapped[str] = mapped_column(String(128), nullable=False)  # e.g., "user_balance_update"
+    target_type: Mapped[Optional[str]] = mapped_column(String(64))  # e.g., "user", "transaction"
+    target_id: Mapped[Optional[str]] = mapped_column(String(128))  # ID of affected entity
+
+    details: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)  # Additional info
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_admin_logs_admin_id", "admin_id"),
+        Index("ix_admin_logs_created_at", "created_at"),
+        Index("ix_admin_logs_action", "action"),
+    )
+
+
 @dataclass
 class Database:
     """
