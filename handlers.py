@@ -2926,7 +2926,8 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             await _show_photo_for_review(q.message, state, lang, db)
             return
 
-        # Poll for results (with retry logic)
+        # Poll for results with detailed logging
+        logger.info(f"Starting to poll for redo task_id={task_id} generation_id={new_generation_id}")
         max_retries = 3
         retry_count = 0
         last_error = None
@@ -2934,14 +2935,45 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         while retry_count < max_retries:
             try:
-                result_urls = await asyncio.to_thread(seedream.poll_task, task_id)
-                if result_urls:
-                    break
+                logger.info(f"Redo poll attempt {retry_count + 1}/{max_retries} for task_id={task_id}")
+
+                task_info = await asyncio.to_thread(
+                    seedream.wait_for_result,
+                    task_id,
+                    poll_interval=5.0,
+                    timeout=180.0,
+                )
+
+                logger.info(f"Redo task_id={task_id} completed, parsing results")
+                logger.debug(f"Full task_info response: {task_info}")
+
+                data_info = task_info.get("data", {})
+                result_json_str = data_info.get("resultJson")
+
+                if not result_json_str:
+                    raise RuntimeError(f"No resultJson in task_info for task_id={task_id}")
+
+                logger.debug(f"resultJson string: {result_json_str}")
+                result_obj = json.loads(result_json_str)
+                result_urls = result_obj.get("resultUrls") or []
+
+                if not result_urls:
+                    raise RuntimeError(f"No resultUrls in resultJson for task_id={task_id}")
+
+                logger.info(f"Successfully got {len(result_urls)} result URLs for task_id={task_id}: {result_urls}")
+                break
+
             except Exception as e:
                 last_error = e
                 retry_count += 1
+                logger.warning(
+                    f"Redo polling attempt {retry_count} failed for task_id={task_id}",
+                    extra={"error": repr(e), "task_id": task_id, "generation_id": new_generation_id}
+                )
                 if retry_count < max_retries:
-                    await asyncio.sleep(2 ** retry_count)
+                    sleep_time = 2 ** retry_count
+                    logger.info(f"Sleeping {sleep_time}s before retry")
+                    await asyncio.sleep(sleep_time)
 
         if not result_urls:
             # All retries failed - refund credits
@@ -2960,7 +2992,16 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 if user_db and gen_db:
                     user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
 
-            logger.error("Seedream poll_task failed after all retries (redo)", extra={"error": repr(last_error)})
+            logger.error(
+                f"Redo generation failed after all retries for task_id={task_id}",
+                extra={
+                    "error": repr(last_error),
+                    "task_id": task_id,
+                    "generation_id": new_generation_id,
+                    "photo_idx": photo_idx
+                },
+                exc_info=last_error
+            )
             await q.message.answer(T(lang, "generation_failed"))
 
             # Move to next photo (fault tolerance)
@@ -2972,10 +3013,23 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         # Download new image
         try:
+            logger.info(f"Downloading redo result from {result_urls[0]}")
             download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+            logger.info(f"Got download URL: {download_url}")
+
             img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+            logger.info(f"Successfully downloaded {len(img_bytes)} bytes for redo")
         except Exception as e:
-            logger.exception("Failed to download regenerated image", exc_info=e)
+            logger.exception(
+                f"Failed to download regenerated image for task_id={task_id}",
+                extra={
+                    "task_id": task_id,
+                    "generation_id": new_generation_id,
+                    "result_urls": result_urls,
+                    "error": repr(e)
+                },
+                exc_info=e
+            )
             await q.message.answer(T(lang, "generation_failed"))
 
             # Move to next photo (fault tolerance)
@@ -3213,7 +3267,8 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 await q.message.answer(T(lang, "generation_failed"))
                 return
 
-            # Poll for results
+            # Poll for results with detailed logging
+            logger.info(f"Starting to poll for redo single task_id={task_id} generation_id={new_generation_id}")
             max_retries = 3
             retry_count = 0
             last_error = None
@@ -3221,14 +3276,45 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
             while retry_count < max_retries:
                 try:
-                    result_urls = await asyncio.to_thread(seedream.poll_task, task_id)
-                    if result_urls:
-                        break
+                    logger.info(f"Redo single poll attempt {retry_count + 1}/{max_retries} for task_id={task_id}")
+
+                    task_info = await asyncio.to_thread(
+                        seedream.wait_for_result,
+                        task_id,
+                        poll_interval=5.0,
+                        timeout=180.0,
+                    )
+
+                    logger.info(f"Redo single task_id={task_id} completed, parsing results")
+                    logger.debug(f"Full task_info response: {task_info}")
+
+                    data_info = task_info.get("data", {})
+                    result_json_str = data_info.get("resultJson")
+
+                    if not result_json_str:
+                        raise RuntimeError(f"No resultJson in task_info for task_id={task_id}")
+
+                    logger.debug(f"resultJson string: {result_json_str}")
+                    result_obj = json.loads(result_json_str)
+                    result_urls = result_obj.get("resultUrls") or []
+
+                    if not result_urls:
+                        raise RuntimeError(f"No resultUrls in resultJson for task_id={task_id}")
+
+                    logger.info(f"Successfully got {len(result_urls)} result URLs for task_id={task_id}: {result_urls}")
+                    break
+
                 except Exception as e:
                     last_error = e
                     retry_count += 1
+                    logger.warning(
+                        f"Redo single polling attempt {retry_count} failed for task_id={task_id}",
+                        extra={"error": repr(e), "task_id": task_id, "generation_id": new_generation_id}
+                    )
                     if retry_count < max_retries:
-                        await asyncio.sleep(2 ** retry_count)
+                        sleep_time = 2 ** retry_count
+                        logger.info(f"Sleeping {sleep_time}s before retry")
+                        await asyncio.sleep(sleep_time)
 
             if not result_urls:
                 # All retries failed - refund credits
@@ -3247,16 +3333,37 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                     if user_db and gen_db:
                         user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
 
-                logger.error("Seedream poll_task failed after all retries (redo single)", extra={"error": repr(last_error)})
+                logger.error(
+                    f"Redo single generation failed after all retries for task_id={task_id}",
+                    extra={
+                        "error": repr(last_error),
+                        "task_id": task_id,
+                        "generation_id": new_generation_id
+                    },
+                    exc_info=last_error
+                )
                 await q.message.answer(T(lang, "generation_failed"))
                 return
 
             # Download new image
             try:
+                logger.info(f"Downloading redo single result from {result_urls[0]}")
                 download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+                logger.info(f"Got download URL: {download_url}")
+
                 img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+                logger.info(f"Successfully downloaded {len(img_bytes)} bytes for redo single")
             except Exception as e:
-                logger.exception("Failed to download regenerated image (redo single)", exc_info=e)
+                logger.exception(
+                    f"Failed to download regenerated image (redo single) for task_id={task_id}",
+                    extra={
+                        "task_id": task_id,
+                        "generation_id": new_generation_id,
+                        "result_urls": result_urls,
+                        "error": repr(e)
+                    },
+                    exc_info=e
+                )
                 await q.message.answer(T(lang, "generation_failed"))
                 return
 
