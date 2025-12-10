@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Seedream Admin{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Total Users</div>
+                <div class="stat-value">{{ stats.total_users }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Active Users (30d)</div>
+                <div class="stat-value">{{ stats.active_users }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Total Revenue</div>
+                <div class="stat-value">{{ "%.2f"|format(stats.total_revenue) }} ₽</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Avg Check</div>
+                <div class="stat-value">{{ "%.2f"|format(stats.avg_check) }} ₽</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Total Generations</div>
+                <div class="stat-value">{{ stats.total_generations }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Successful</div>
+                <div class="stat-value">{{ stats.successful_generations }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value">{{ stats.success_rate }}%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-dollar-sign text-success"></i> Recent Transactions</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>User ID</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tx in recent_transactions %}
+                            <tr>
+                                <td>{{ tx.user_id or 'N/A' }}</td>
+                                <td>{{ "%.2f"|format(tx.amount) }} {{ tx.currency }}</td>
+                                <td>
+                                    <span class="badge bg-{% if tx.status.value == 'succeeded' %}success{% elif tx.status.value == 'pending' %}warning{% else %}danger{% endif %}">
+                                        {{ tx.status.value }}
+                                    </span>
+                                </td>
+                                <td><small>{{ tx.created_at.strftime('%Y-%m-%d %H:%M') if tx.created_at else 'N/A' }}</small></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">No transactions yet</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white text-center">
+                <a href="/admin/transactions" class="text-decoration-none">View all transactions →</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-users text-primary"></i> Recent Users</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Credits</th>
+                                <th>Joined</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in recent_users %}
+                            <tr>
+                                <td><a href="/admin/users/{{ user.id }}">{{ user.user_id }}</a></td>
+                                <td>{{ user.tg_username or 'N/A' }}</td>
+                                <td>{{ user.credits_balance or 0 }}</td>
+                                <td><small>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</small></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">No users yet</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer bg-white text-center">
+                <a href="/admin/users" class="text-decoration-none">View all users →</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
