@@ -29,6 +29,15 @@ phrases = {
         "balance_price_per_gen": "Стоимость 1 генерации: <b>{price} ₽</b>",
         "btn_topup": "💳 Пополнить баланс",
 
+        # Payment method selection
+        "payment_method_title": "💳 <b>Выберите способ оплаты</b>",
+        "payment_method_desc": "Выберите удобный для вас способ пополнения баланса:",
+        "btn_pay_stars": "⭐️ Telegram Stars",
+        "btn_pay_yookassa": "💳 Банковская карта (YooKassa)",
+        "payment_stars_desc": "Оплата через Telegram Stars",
+        "payment_yookassa_desc": "Оплата банковской картой через YooKassa",
+        "yookassa_not_configured": "❌ Оплата через YooKassa временно недоступна",
+
         # History view
         "history_title": "📜 <b>История генераций</b>",
         "history_empty": "У вас пока нет завершённых генераций.",
@@ -396,6 +405,15 @@ phrases = {
         "balance_rubles": "Rubles: <b>{amount} ₽</b>",
         "balance_price_per_gen": "Price per generation: <b>{price} ₽</b>",
         "btn_topup": "💳 Top Up Balance",
+
+        # Payment method selection
+        "payment_method_title": "💳 <b>Choose Payment Method</b>",
+        "payment_method_desc": "Select your preferred payment method to top up balance:",
+        "btn_pay_stars": "⭐️ Telegram Stars",
+        "btn_pay_yookassa": "💳 Bank Card (YooKassa)",
+        "payment_stars_desc": "Payment via Telegram Stars",
+        "payment_yookassa_desc": "Bank card payment via YooKassa",
+        "yookassa_not_configured": "❌ YooKassa payment is temporarily unavailable",
 
         # History view
         "history_title": "📜 <b>Generation History</b>",

@@ -34,6 +34,7 @@ from db import (
 )
 from fsm import PaymentFlow, set_waiting_payment, PaymentGuard
 from seedream_service import SeedreamService
+from yookassa_payment import YooKassaPay
 from config import *
 import asyncio
 import json
@@ -186,7 +187,8 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     r = Router()
     r.message.middleware(PaymentGuard())
     pay = StarsPay(db)
-    
+    yookassa = YooKassaPay(db)
+
 
     # --- /start ---
     @r.message(Command("start"))
@@ -231,6 +233,17 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             ]
         )
         await message.answer(T(lang, "account_menu"), reply_markup=kb)
+
+    async def _show_payment_method_selection(message: Message, lang: str):
+        """Show payment method selection (Stars or YooKassa)."""
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_pay_stars"), callback_data="pay:stars")],
+                [InlineKeyboardButton(text=T(lang, "btn_pay_yookassa"), callback_data="pay:yookassa")],
+            ]
+        )
+        text = f"{T(lang, 'payment_method_title')}\n\n{T(lang, 'payment_method_desc')}"
+        await message.answer(text, reply_markup=kb)
 
     @r.message(Command("profile"))
     async def cmd_profile(m: Message):
@@ -296,16 +309,9 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
     @r.callback_query(F.data == "account:topup")
     async def on_account_topup(q: CallbackQuery, state: FSMContext):
-        """Handle top-up request - trigger invoice like /buy command."""
+        """Handle top-up request - show payment method selection."""
         lang = await get_lang(q, db)
-        await pay.send_invoice(
-            q.message,
-            state=state,
-            title=T(lang, "invoice_title"),
-            desc=T(lang, "invoice_desc"),
-            stars=1,
-            payload=f"demo:{q.from_user.id}",
-        )
+        await _show_payment_method_selection(q.message, lang)
         await q.answer()
 
     @r.callback_query(F.data == "account:menu")
@@ -578,15 +584,48 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
     @r.message(Command("buy"))
     async def cmd_buy(m: Message, state: FSMContext):
+        """Show payment method selection for top-up."""
         lang = await get_lang(m, db)
+        await _show_payment_method_selection(m, lang)
+
+    # --- Payment method selection callbacks ---
+
+    @r.callback_query(F.data == "pay:stars")
+    async def on_pay_stars(q: CallbackQuery, state: FSMContext):
+        """Handle Telegram Stars payment selection."""
+        lang = await get_lang(q, db)
         await pay.send_invoice(
-            m,
+            q.message,
             state=state,
             title=T(lang, "invoice_title"),
             desc=T(lang, "invoice_desc"),
             stars=1,
-            payload=f"demo:{m.from_user.id}",
+            payload=f"demo:{q.from_user.id}",
         )
+        await q.answer()
+
+    @r.callback_query(F.data == "pay:yookassa")
+    async def on_pay_yookassa(q: CallbackQuery, state: FSMContext):
+        """Handle YooKassa payment selection."""
+        lang = await get_lang(q, db)
+
+        if not yookassa.enabled:
+            await q.message.answer(T(lang, "yookassa_not_configured"))
+            await q.answer()
+            return
+
+        # TODO: Add amount selection UI
+        # For now, use a default amount of 100 rubles
+        amount_rubles = 100.0
+        description = T(lang, "invoice_title")
+
+        await yookassa.send_payment_link(
+            q.message,
+            state,
+            amount_rubles=amount_rubles,
+            description=description,
+        )
+        await q.answer()
 
     # --- /language (и /lang, /swith_lang для совместимости) ---
 
