@@ -33,11 +33,9 @@ phrases = {
         "history_title": "📜 <b>История генераций</b>",
         "history_empty": "У вас пока нет завершённых генераций.",
         "history_item": (
-            "📅 {date}\n"
-            "⏰ {time}\n"
+            "📅 {datetime}\n"
             "💰 Стоимость: {cost} кредитов\n"
-            "📝 Параметры: {params}\n"
-            "🖼 Изображений: {images_count}"
+            "📝 Параметры: {params}"
         ),
         "btn_download": "⬇️ Скачать",
         "btn_use_as_base": "🎨 Использовать как базу",
@@ -403,11 +401,9 @@ phrases = {
         "history_title": "📜 <b>Generation History</b>",
         "history_empty": "You don't have any completed generations yet.",
         "history_item": (
-            "📅 {date}\n"
-            "⏰ {time}\n"
+            "📅 {datetime}\n"
             "💰 Cost: {cost} credits\n"
-            "📝 Parameters: {params}\n"
-            "🖼 Images: {images_count}"
+            "📝 Parameters: {params}"
         ),
         "btn_download": "⬇️ Download",
         "btn_use_as_base": "🎨 Use as Base",
