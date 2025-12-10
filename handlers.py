@@ -2614,10 +2614,22 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         if current_idx >= len(photos):
             # No more photos to review
             if approved:
-                # Has approved photos - move to new angles/poses stage (stub)
+                # Has approved photos - move to new angles/poses stage
                 await message.answer(T(lang, "all_photos_reviewed", approved=len(approved)))
                 await message.answer(T(lang, "moving_to_angles"))
-                await state.set_state(GenerationFlow.new_angles_poses)
+
+                # Get approved photos data
+                approved_photos_data = [photos[idx] for idx in approved]
+
+                # Initialize angles/poses stage
+                await state.update_data(
+                    base_photos=approved_photos_data,
+                    current_base_index=0,
+                )
+                await state.set_state(GenerationFlow.angles_poses_menu)
+
+                # Show first base photo menu
+                await _show_angles_poses_menu(message, state, lang, db)
             else:
                 # No approved photos - show redo dialog
                 await message.answer(T(lang, "no_more_photos"))
@@ -3412,6 +3424,649 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         lang = await get_lang(q, db)
         await q.message.answer(T(lang, "no_credits"))
         await q.answer()
+
+
+    # ==================================================================
+    # ANGLES AND POSES STAGE (Stage 6)
+    # ==================================================================
+
+    async def _show_angles_poses_menu(message: Message, state: FSMContext, lang: str, db: Database):
+        """Show the angles/poses menu for the current base photo."""
+        from aiogram.types import BufferedInputFile
+
+        data = await state.get_data()
+        base_photos = data.get("base_photos", [])
+        current_idx = data.get("current_base_index", 0)
+
+        if current_idx >= len(base_photos):
+            # All base photos processed
+            await message.answer(T(lang, "all_base_photos_complete"))
+            await state.clear()
+            return
+
+        base_photo = base_photos[current_idx]
+
+        # Show base photo with menu
+        caption = f"{T(lang, 'angles_intro')}\n\n{T(lang, 'angles_base_photo')}"
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_change_pose"), callback_data="angles:pose:1")],
+                [InlineKeyboardButton(text=T(lang, "btn_change_pose_5x"), callback_data="angles:pose:5")],
+                [InlineKeyboardButton(text=T(lang, "btn_change_angle"), callback_data="angles:angle:1")],
+                [InlineKeyboardButton(text=T(lang, "btn_change_angle_5x"), callback_data="angles:angle:5")],
+                [InlineKeyboardButton(text=T(lang, "btn_add_rear_view"), callback_data="angles:rear")],
+                [InlineKeyboardButton(text=T(lang, "btn_full_body"), callback_data="angles:full_body")],
+                [InlineKeyboardButton(text=T(lang, "btn_upper_body"), callback_data="angles:upper_body")],
+                [InlineKeyboardButton(text=T(lang, "btn_lower_body"), callback_data="angles:lower_body")],
+                [InlineKeyboardButton(text=T(lang, "btn_finish_photo"), callback_data="angles:finish")],
+            ]
+        )
+
+        await message.answer_document(
+            document=BufferedInputFile(
+                base_photo["bytes"],
+                filename=f"base_photo_{current_idx + 1}.png"
+            ),
+            caption=caption,
+            reply_markup=kb
+        )
+
+
+    @r.callback_query(F.data.startswith("angles:pose:") | F.data.startswith("angles:angle:"))
+    async def on_angles_pose_angle(q: CallbackQuery, state: FSMContext):
+        """Handle pose/angle change requests."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        # Parse action: angles:pose:1 or angles:angle:5
+        parts = q.data.split(":")
+        action_type = parts[1]  # "pose" or "angle"
+        count = int(parts[2])   # 1 or 5
+
+        data = await state.get_data()
+        base_photos = data.get("base_photos", [])
+        current_idx = data.get("current_base_index", 0)
+
+        if current_idx >= len(base_photos):
+            await q.message.answer(T(lang, "all_base_photos_complete"))
+            return
+
+        base_photo = base_photos[current_idx]
+        generation_id = base_photo.get("generation_id")
+
+        # Build prompt based on action type
+        if action_type == "pose":
+            prompt = "Change pose"
+        else:  # angle
+            prompt = "Change angle"
+
+        # Get aspect ratio from base photo params
+        aspect = base_photo.get("aspect", "3_4")
+        image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
+
+        # Check credits
+        async with db.session() as s:
+            user_db = (
+                await s.execute(select(User).where(User.user_id == q.from_user.id))
+            ).scalar_one_or_none()
+
+            if not user_db or (user_db.credits_balance or 0) < count:
+                await q.message.answer(T(lang, "insufficient_balance"))
+                return
+
+        # Show processing message
+        await q.message.answer(T(lang, "processing_generation"))
+
+        # Generate variants
+        for i in range(count):
+            try:
+                # Create generation record
+                async with db.session() as s:
+                    gen_obj, user, price = await ensure_credits_and_create_generation(
+                        s,
+                        tg_user_id=q.from_user.id,
+                        prompt=prompt,
+                        scenario_key="initial_generation",
+                        total_images_planned=1,
+                        params={"action": action_type, "base_generation_id": generation_id},
+                        source_image_urls=[base_photo["url"]],
+                    )
+
+                    if gen_obj is None:
+                        await q.message.answer(T(lang, "insufficient_balance"))
+                        return
+
+                    await s.flush()
+                    new_generation_id = gen_obj.id
+
+                # Submit task
+                task_id = await asyncio.to_thread(
+                    seedream.create_task,
+                    prompt=prompt,
+                    image_urls=[base_photo["url"]],
+                    image_size=image_size,
+                    image_resolution=image_resolution,
+                )
+
+                # Update status
+                async with db.session() as s:
+                    gen_db = (
+                        await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                    ).scalar_one_or_none()
+                    if gen_db:
+                        gen_db.external_id = task_id
+                        gen_db.status = GenerationStatus.running
+
+                # Poll for result
+                task_info = await asyncio.to_thread(
+                    seedream.wait_for_result,
+                    task_id,
+                    poll_interval=5.0,
+                    timeout=180.0,
+                )
+
+                data_info = task_info.get("data", {})
+                result_json_str = data_info.get("resultJson")
+                result_obj = json.loads(result_json_str)
+                result_urls = result_obj.get("resultUrls") or []
+
+                if not result_urls:
+                    raise RuntimeError(f"No result URLs")
+
+                # Download image
+                download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+                img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+
+                # Update generation status
+                async with db.session() as s:
+                    gen_db = (
+                        await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                    ).scalar_one_or_none()
+                    if gen_db:
+                        gen_db.status = GenerationStatus.succeeded
+                        gen_db.images_generated = 1
+                        gen_db.finished_at = datetime.now(timezone.utc)
+
+                    # Save image
+                    img = GeneratedImage(
+                        generation_id=new_generation_id,
+                        user_id=q.from_user.id,
+                        role=ImageRole.variant,
+                        storage_url=result_urls[0],
+                        telegram_file_id=None,
+                    )
+                    s.add(img)
+
+                # Show result with redo/continue buttons
+                kb = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text=T(lang, "btn_redo_variant"), callback_data=f"angles:redo_variant:{action_type}:{count}")],
+                        [InlineKeyboardButton(text=T(lang, "btn_continue_variants"), callback_data="angles:continue")],
+                    ]
+                )
+
+                await q.message.answer_document(
+                    document=BufferedInputFile(img_bytes, filename=f"variant_{i+1}.png"),
+                    caption=T(lang, "variant_result"),
+                    reply_markup=kb
+                )
+
+            except Exception as e:
+                logger.exception(f"Failed to generate {action_type} variant", exc_info=e)
+                async with db.session() as s:
+                    gen_db = (
+                        await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                    ).scalar_one_or_none()
+                    user_db = (
+                        await s.execute(select(User).where(User.user_id == q.from_user.id))
+                    ).scalar_one_or_none()
+
+                    if gen_db:
+                        gen_db.status = GenerationStatus.failed
+                        gen_db.error_message = str(e)
+                        gen_db.finished_at = datetime.now(timezone.utc)
+                    if user_db and gen_db:
+                        user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
+
+                await q.message.answer(T(lang, "generation_failed"))
+
+
+    @r.callback_query(F.data == "angles:rear")
+    async def on_angles_rear_view(q: CallbackQuery, state: FSMContext):
+        """Handle rear view request."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        # Ask for rear photo
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_no_rear_photo"), callback_data="angles:rear_no_photo")],
+            ]
+        )
+
+        await q.message.answer(T(lang, "rear_view_prompt"), reply_markup=kb)
+        await state.set_state(GenerationFlow.waiting_rear_photo)
+
+
+    @r.callback_query(F.data == "angles:rear_no_photo")
+    async def on_angles_rear_no_photo(q: CallbackQuery, state: FSMContext):
+        """Handle rear view without reference photo."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        data = await state.get_data()
+        base_photos = data.get("base_photos", [])
+        current_idx = data.get("current_base_index", 0)
+
+        if current_idx >= len(base_photos):
+            return
+
+        base_photo = base_photos[current_idx]
+        generation_id = base_photo.get("generation_id")
+        aspect = base_photo.get("aspect", "3_4")
+        image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
+
+        prompt = "Change the pose and angle to a back view"
+
+        # Generate rear view
+        try:
+            # Check credits and create generation
+            async with db.session() as s:
+                gen_obj, user, price = await ensure_credits_and_create_generation(
+                    s,
+                    tg_user_id=q.from_user.id,
+                    prompt=prompt,
+                    scenario_key="initial_generation",
+                    total_images_planned=1,
+                    params={"action": "rear_view_no_ref", "base_generation_id": generation_id},
+                    source_image_urls=[base_photo["url"]],
+                )
+
+                if gen_obj is None:
+                    await q.message.answer(T(lang, "insufficient_balance"))
+                    return
+
+                await s.flush()
+                new_generation_id = gen_obj.id
+
+            await q.message.answer(T(lang, "processing_generation"))
+
+            # Submit task
+            task_id = await asyncio.to_thread(
+                seedream.create_task,
+                prompt=prompt,
+                image_urls=[base_photo["url"]],
+                image_size=image_size,
+                image_resolution=image_resolution,
+            )
+
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.external_id = task_id
+                    gen_db.status = GenerationStatus.running
+
+            # Poll for result
+            task_info = await asyncio.to_thread(seedream.wait_for_result, task_id, poll_interval=5.0, timeout=180.0)
+            data_info = task_info.get("data", {})
+            result_json_str = data_info.get("resultJson")
+            result_obj = json.loads(result_json_str)
+            result_urls = result_obj.get("resultUrls") or []
+
+            if not result_urls:
+                raise RuntimeError("No result URLs")
+
+            # Download
+            download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+            img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+
+            # Update status
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.status = GenerationStatus.succeeded
+                    gen_db.images_generated = 1
+                    gen_db.finished_at = datetime.now(timezone.utc)
+
+                img = GeneratedImage(
+                    generation_id=new_generation_id,
+                    user_id=q.from_user.id,
+                    role=ImageRole.variant,
+                    storage_url=result_urls[0],
+                    telegram_file_id=None,
+                )
+                s.add(img)
+
+            # Show result
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_redo_variant"), callback_data="angles:redo_variant:rear_no_ref:1")],
+                    [InlineKeyboardButton(text=T(lang, "btn_continue_variants"), callback_data="angles:continue")],
+                ]
+            )
+
+            await q.message.answer_document(
+                document=BufferedInputFile(img_bytes, filename="rear_view.png"),
+                caption=T(lang, "variant_result"),
+                reply_markup=kb
+            )
+
+            await state.set_state(GenerationFlow.angles_poses_menu)
+
+        except Exception as e:
+            logger.exception("Failed to generate rear view", exc_info=e)
+            await q.message.answer(T(lang, "generation_failed"))
+
+
+    @r.callback_query(F.data.startswith("angles:full_body") | F.data.startswith("angles:upper_body") | F.data.startswith("angles:lower_body"))
+    async def on_angles_framing(q: CallbackQuery, state: FSMContext):
+        """Handle framing options (full/upper/lower body)."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        # Parse action
+        framing_type = q.data.split(":")[-1]  # full_body, upper_body, or lower_body
+
+        if framing_type == "full_body":
+            prompt = "Change to a full body shot"
+        elif framing_type == "upper_body":
+            prompt = "Change to an upper body shot"
+        else:  # lower_body
+            prompt = "Change to a lower body shot"
+
+        data = await state.get_data()
+        base_photos = data.get("base_photos", [])
+        current_idx = data.get("current_base_index", 0)
+
+        if current_idx >= len(base_photos):
+            return
+
+        base_photo = base_photos[current_idx]
+        generation_id = base_photo.get("generation_id")
+        aspect = base_photo.get("aspect", "3_4")
+        image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
+
+        try:
+            async with db.session() as s:
+                gen_obj, user, price = await ensure_credits_and_create_generation(
+                    s,
+                    tg_user_id=q.from_user.id,
+                    prompt=prompt,
+                    scenario_key="initial_generation",
+                    total_images_planned=1,
+                    params={"action": framing_type, "base_generation_id": generation_id},
+                    source_image_urls=[base_photo["url"]],
+                )
+
+                if gen_obj is None:
+                    await q.message.answer(T(lang, "insufficient_balance"))
+                    return
+
+                await s.flush()
+                new_generation_id = gen_obj.id
+
+            await q.message.answer(T(lang, "processing_generation"))
+
+            task_id = await asyncio.to_thread(
+                seedream.create_task,
+                prompt=prompt,
+                image_urls=[base_photo["url"]],
+                image_size=image_size,
+                image_resolution=image_resolution,
+            )
+
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.external_id = task_id
+                    gen_db.status = GenerationStatus.running
+
+            task_info = await asyncio.to_thread(seedream.wait_for_result, task_id, poll_interval=5.0, timeout=180.0)
+            data_info = task_info.get("data", {})
+            result_json_str = data_info.get("resultJson")
+            result_obj = json.loads(result_json_str)
+            result_urls = result_obj.get("resultUrls") or []
+
+            if not result_urls:
+                raise RuntimeError("No result URLs")
+
+            download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+            img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.status = GenerationStatus.succeeded
+                    gen_db.images_generated = 1
+                    gen_db.finished_at = datetime.now(timezone.utc)
+
+                img = GeneratedImage(
+                    generation_id=new_generation_id,
+                    user_id=q.from_user.id,
+                    role=ImageRole.variant,
+                    storage_url=result_urls[0],
+                    telegram_file_id=None,
+                )
+                s.add(img)
+
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_redo_variant"), callback_data=f"angles:redo_variant:{framing_type}:1")],
+                    [InlineKeyboardButton(text=T(lang, "btn_continue_variants"), callback_data="angles:continue")],
+                ]
+            )
+
+            await q.message.answer_document(
+                document=BufferedInputFile(img_bytes, filename=f"{framing_type}.png"),
+                caption=T(lang, "variant_result"),
+                reply_markup=kb
+            )
+
+        except Exception as e:
+            logger.exception(f"Failed to generate {framing_type}", exc_info=e)
+            await q.message.answer(T(lang, "generation_failed"))
+
+
+    @r.callback_query(F.data == "angles:finish")
+    async def on_angles_finish(q: CallbackQuery, state: FSMContext):
+        """Handle finish button - ask for confirmation."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_yes_finish"), callback_data="angles:finish_confirm")],
+                [InlineKeyboardButton(text=T(lang, "btn_no_continue"), callback_data="angles:finish_cancel")],
+            ]
+        )
+
+        await q.message.answer(T(lang, "confirm_finish_photo"), reply_markup=kb)
+        await state.set_state(GenerationFlow.confirm_finish_photo)
+
+
+    @r.callback_query(F.data == "angles:finish_confirm")
+    async def on_angles_finish_confirm(q: CallbackQuery, state: FSMContext):
+        """Handle confirmed finish - move to next base photo or complete."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        data = await state.get_data()
+        base_photos = data.get("base_photos", [])
+        current_idx = data.get("current_base_index", 0)
+
+        # Move to next base photo
+        next_idx = current_idx + 1
+
+        if next_idx >= len(base_photos):
+            # All done
+            await q.message.answer(T(lang, "all_base_photos_complete"))
+            await state.clear()
+        else:
+            # Show next base photo
+            await state.update_data(current_base_index=next_idx)
+            await state.set_state(GenerationFlow.angles_poses_menu)
+            await q.message.answer(T(lang, "moving_to_next_base"))
+            await _show_angles_poses_menu(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data == "angles:finish_cancel")
+    async def on_angles_finish_cancel(q: CallbackQuery, state: FSMContext):
+        """Handle cancelled finish - return to angles menu."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        await state.set_state(GenerationFlow.angles_poses_menu)
+        await _show_angles_poses_menu(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data == "angles:continue")
+    async def on_angles_continue(q: CallbackQuery, state: FSMContext):
+        """Handle continue button - return to angles menu."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        await state.set_state(GenerationFlow.angles_poses_menu)
+        await _show_angles_poses_menu(q.message, state, lang, db)
+
+
+    @r.message(GenerationFlow.waiting_rear_photo, F.document)
+    async def on_rear_photo_upload(m: Message, state: FSMContext):
+        """Handle rear photo upload for rear view generation."""
+        lang = await get_lang(m, db)
+
+        # Download uploaded rear photo
+        file_buf = BytesIO()
+        try:
+            await bot.download(file=m.document.file_id, destination=file_buf)
+            file_buf.seek(0)
+            rear_bytes = file_buf.read()
+        except Exception as e:
+            logger.exception("Failed to download rear photo", exc_info=e)
+            await m.answer(T(lang, "generation_failed"))
+            return
+
+        # Upload to Seedream
+        try:
+            rear_url = await asyncio.to_thread(
+                seedream.upload_image_bytes,
+                rear_bytes,
+                f"rear_{m.from_user.id}_{m.document.file_id}.jpg"
+            )
+        except Exception as e:
+            logger.exception("Failed to upload rear photo to Seedream", exc_info=e)
+            await m.answer(T(lang, "generation_failed"))
+            return
+
+        # Get base photo data
+        data = await state.get_data()
+        base_photos = data.get("base_photos", [])
+        current_idx = data.get("current_base_index", 0)
+
+        if current_idx >= len(base_photos):
+            return
+
+        base_photo = base_photos[current_idx]
+        generation_id = base_photo.get("generation_id")
+        aspect = base_photo.get("aspect", "3_4")
+        image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
+
+        prompt = "Change the pose and angle to a back view. Use the second image as a reference for how those clothes look from the back."
+
+        # Generate rear view with reference
+        try:
+            async with db.session() as s:
+                gen_obj, user, price = await ensure_credits_and_create_generation(
+                    s,
+                    tg_user_id=m.from_user.id,
+                    prompt=prompt,
+                    scenario_key="initial_generation",
+                    total_images_planned=1,
+                    params={"action": "rear_view_with_ref", "base_generation_id": generation_id},
+                    source_image_urls=[base_photo["url"], rear_url],
+                )
+
+                if gen_obj is None:
+                    await m.answer(T(lang, "insufficient_balance"))
+                    return
+
+                await s.flush()
+                new_generation_id = gen_obj.id
+
+            await m.answer(T(lang, "processing_generation"))
+
+            task_id = await asyncio.to_thread(
+                seedream.create_task,
+                prompt=prompt,
+                image_urls=[base_photo["url"], rear_url],
+                image_size=image_size,
+                image_resolution=image_resolution,
+            )
+
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.external_id = task_id
+                    gen_db.status = GenerationStatus.running
+
+            task_info = await asyncio.to_thread(seedream.wait_for_result, task_id, poll_interval=5.0, timeout=180.0)
+            data_info = task_info.get("data", {})
+            result_json_str = data_info.get("resultJson")
+            result_obj = json.loads(result_json_str)
+            result_urls = result_obj.get("resultUrls") or []
+
+            if not result_urls:
+                raise RuntimeError("No result URLs")
+
+            download_url = await asyncio.to_thread(seedream.get_download_url, result_urls[0])
+            img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+
+            async with db.session() as s:
+                gen_db = (
+                    await s.execute(select(Generation).where(Generation.id == new_generation_id))
+                ).scalar_one_or_none()
+                if gen_db:
+                    gen_db.status = GenerationStatus.succeeded
+                    gen_db.images_generated = 1
+                    gen_db.finished_at = datetime.now(timezone.utc)
+
+                img = GeneratedImage(
+                    generation_id=new_generation_id,
+                    user_id=m.from_user.id,
+                    role=ImageRole.variant,
+                    storage_url=result_urls[0],
+                    telegram_file_id=None,
+                )
+                s.add(img)
+
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_redo_variant"), callback_data="angles:redo_variant:rear_with_ref:1")],
+                    [InlineKeyboardButton(text=T(lang, "btn_continue_variants"), callback_data="angles:continue")],
+                ]
+            )
+
+            await m.answer_document(
+                document=BufferedInputFile(img_bytes, filename="rear_view_ref.png"),
+                caption=T(lang, "variant_result"),
+                reply_markup=kb
+            )
+
+            await state.set_state(GenerationFlow.angles_poses_menu)
+
+        except Exception as e:
+            logger.exception("Failed to generate rear view with reference", exc_info=e)
+            await m.answer(T(lang, "generation_failed"))
 
 
     # --- payments flow ---
