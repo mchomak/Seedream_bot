@@ -10,7 +10,7 @@ import asyncio
 import getpass
 from db import Database, AdminUser
 from config import load_env
-import passlib.hash
+import bcrypt
 
 
 async def create_admin():
@@ -40,7 +40,7 @@ async def create_admin():
         return
 
     # Hash password
-    password_hash = passlib.hash.bcrypt.hash(password)
+    password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
     # Connect to database
     settings = load_env()

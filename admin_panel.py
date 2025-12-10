@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
-import passlib.hash
+import bcrypt
 
 from sqlalchemy import select, func, and_, or_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,12 +93,12 @@ async def require_admin(request: Request) -> AdminUser:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash."""
-    return passlib.hash.bcrypt.verify(plain_password, hashed_password)
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
 
 def hash_password(password: str) -> str:
     """Hash password."""
-    return passlib.hash.bcrypt.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 
 async def log_admin_action(
