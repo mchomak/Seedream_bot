@@ -35,6 +35,7 @@ from db import (
 from yookassa_service import YooKassaService
 from fsm import *
 from seedream_service import SeedreamService
+from yookassa_service import YooKassaService
 from config import *
 import asyncio
 import json
@@ -190,9 +191,12 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     pay = StarsPay(db)
     yookassa = YooKassaService()
 
+    yookassa = YooKassaService()
+
 
     # --- /start ---
     @r.message(Command("start"))
+    async def cmd_start(m: Message, state: FSMContext):
     async def cmd_start(m: Message, state: FSMContext):
         async with db.session() as s:
             await upsert_user_basic(
@@ -210,6 +214,11 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             f"<b>{T(lang, 'start_title')}</b>\n{T(lang, 'start_desc')}",
             reply_markup=build_main_keyboard(lang)
         )
+        await state.clear()  # Clear any existing state
+        await m.answer(
+            f"<b>{T(lang, 'start_title')}</b>\n{T(lang, 'start_desc')}",
+            reply_markup=build_main_keyboard(lang)
+        )
 
     # --- /help ---
 
@@ -222,6 +231,29 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             lines.append(f"/{cmd} — {desc}")
         await m.answer("\n".join(lines))
 
+    # --- /profile (now Account Menu) ---
+
+    async def _show_account_menu(message: Message, lang: str):
+        """Show the account menu with Balance and History buttons."""
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_balance"), callback_data="account:balance")],
+                [InlineKeyboardButton(text=T(lang, "btn_history"), callback_data="account:history:0")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:back")],
+            ]
+        )
+        await message.answer(T(lang, "account_menu"), reply_markup=kb)
+
+    async def _show_payment_method_selection(message: Message, lang: str):
+        """Show payment method selection (Stars or YooKassa)."""
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_pay_stars"), callback_data="pay:stars")],
+                [InlineKeyboardButton(text=T(lang, "btn_pay_yookassa"), callback_data="pay:yookassa")],
+            ]
+        )
+        text = f"{T(lang, 'payment_method_title')}\n\n{T(lang, 'payment_method_desc')}"
+        await message.answer(text, reply_markup=kb)
     # --- /profile (now Account Menu) ---
 
     async def _show_account_menu(message: Message, lang: str):
@@ -278,13 +310,334 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         """Show balance view."""
         lang = await get_lang(q, db)
 
+        await _show_account_menu(m, lang)
+
+    # Handle keyboard button presses
+    @r.message(F.text.in_([phrases["ru"]["kb_my_account"], phrases["en"]["kb_my_account"]]))
+    async def on_my_account_button(m: Message):
+        lang = await get_lang(m, db)
+        await _show_account_menu(m, lang)
+
+    @r.message(F.text.in_([phrases["ru"]["kb_generation"], phrases["en"]["kb_generation"]]))
+    async def on_generation_button(m: Message, state: FSMContext):
+        # Redirect to /generate command
+        await cmd_generate(m, state)
+
+    @r.message(F.text.in_([phrases["ru"]["kb_examples"], phrases["en"]["kb_examples"]]))
+    async def on_examples_button(m: Message):
+        # Redirect to /examples command
+        await cmd_examples(m)
+
+    # Account menu callbacks
+    @r.callback_query(F.data == "account:back")
+    async def on_account_back(q: CallbackQuery):
+        await q.message.delete()
+        await q.answer()
+
+    @r.callback_query(F.data == "account:balance")
+    async def on_account_balance(q: CallbackQuery):
+        """Show balance view."""
+        lang = await get_lang(q, db)
+
         async with db.session() as s:
+            prof = await get_profile(s, tg_user_id=q.from_user.id)
             prof = await get_profile(s, tg_user_id=q.from_user.id)
 
         if not prof.user:
             await q.answer(T(lang, "profile_not_found"), show_alert=True)
+            await q.answer(T(lang, "profile_not_found"), show_alert=True)
             return
 
+        # Assuming 1 generation = 10 rubles (you can adjust this)
+        PRICE_PER_GEN = 10
+
+        text = (
+            f"{T(lang, 'balance_title')}\n\n"
+            f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
+            f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
+            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
+        )
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_topup"), callback_data="account:topup")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")],
+            ]
+        )
+
+        try:
+            await q.message.edit_text(text, reply_markup=kb)
+        except Exception:
+            await q.message.answer(text, reply_markup=kb)
+        await q.answer()
+
+    @r.callback_query(F.data == "account:topup")
+    async def on_account_topup(q: CallbackQuery, state: FSMContext):
+        """Handle top-up request - show payment method selection."""
+        lang = await get_lang(q, db)
+        await _show_payment_method_selection(q.message, lang)
+        await q.answer()
+
+    @r.callback_query(F.data == "account:menu")
+    async def on_account_menu(q: CallbackQuery):
+        """Return to account menu."""
+        lang = await get_lang(q, db)
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_balance"), callback_data="account:balance")],
+                [InlineKeyboardButton(text=T(lang, "btn_history"), callback_data="account:history:0")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:back")],
+            ]
+        )
+
+        try:
+            await q.message.edit_text(T(lang, "account_menu"), reply_markup=kb)
+        except Exception:
+            await q.message.answer(T(lang, "account_menu"), reply_markup=kb)
+        await q.answer()
+
+    @r.callback_query(F.data.startswith("account:history:"))
+    async def on_account_history(q: CallbackQuery):
+        """Show generation history with pagination."""
+        lang = await get_lang(q, db)
+
+        # Parse page number
+        page = int(q.data.split(":")[-1])
+
+        # Get history from database (last month)
+        from datetime import timedelta
+        one_month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+
+        async with db.session() as s:
+            # Get successful generations from last month
+            stmt = (
+                select(Generation)
+                .where(Generation.user_id == q.from_user.id)
+                .where(Generation.status == GenerationStatus.succeeded)
+                .where(Generation.finished_at >= one_month_ago)
+                .order_by(Generation.finished_at.desc())
+            )
+            result = await s.execute(stmt)
+            all_gens = result.scalars().all()
+
+        if not all_gens:
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")],
+                ]
+            )
+            try:
+                await q.message.edit_text(
+                    f"{T(lang, 'history_title')}\n\n{T(lang, 'history_empty')}",
+                    reply_markup=kb
+                )
+            except Exception:
+                await q.message.answer(
+                    f"{T(lang, 'history_title')}\n\n{T(lang, 'history_empty')}",
+                    reply_markup=kb
+                )
+            await q.answer()
+            return
+
+        # Pagination
+        ITEMS_PER_PAGE = 5
+        total_pages = (len(all_gens) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+        page = max(0, min(page, total_pages - 1))
+
+        start_idx = page * ITEMS_PER_PAGE
+        end_idx = start_idx + ITEMS_PER_PAGE
+        page_gens = all_gens[start_idx:end_idx]
+
+        # Build history text
+        lines = [T(lang, "history_title"), ""]
+
+        for gen in page_gens:
+            # Combine date and time into one line
+            datetime_str = gen.finished_at.strftime("%Y-%m-%d %H:%M:%S") if gen.finished_at else "N/A"
+
+            # Format parameters from JSONB into readable text
+            params_dict = gen.params or {}
+            params_parts = []
+
+            # Extract common parameters
+            if "scenario" in params_dict:
+                scenario = params_dict["scenario"]
+                if scenario == "initial_generation":
+                    params_parts.append(f"Scenario: Initial generation")
+                elif scenario == "per_item_generation":
+                    params_parts.append(f"Scenario: Per-item")
+
+            if "action" in params_dict:
+                action = params_dict["action"]
+                action_names = {
+                    "change_pose": "Change pose",
+                    "change_angle": "Change angle",
+                    "rear_view_no_ref": "Rear view",
+                    "rear_view_with_ref": "Rear view (with reference)",
+                    "full_body": "Full body",
+                    "upper_body": "Upper body",
+                    "lower_body": "Lower body",
+                }
+                params_parts.append(action_names.get(action, action))
+
+            if "gender" in params_dict:
+                params_parts.append(f"Gender: {params_dict['gender']}")
+            if "age" in params_dict:
+                params_parts.append(f"Age: {params_dict['age']}")
+            if "background" in params_dict:
+                params_parts.append(f"Background: {params_dict['background']}")
+            if "hair" in params_dict and params_dict["hair"] != "any":
+                params_parts.append(f"Hair: {params_dict['hair']}")
+            if "style" in params_dict:
+                params_parts.append(f"Style: {params_dict['style']}")
+            if "aspect" in params_dict:
+                params_parts.append(f"Aspect: {params_dict['aspect']}")
+
+            params_str = ", ".join(params_parts) if params_parts else "N/A"
+
+            item_text = T(
+                lang,
+                "history_item",
+                datetime=datetime_str,
+                cost=gen.credits_spent or 1,
+                params=params_str,
+            )
+            lines.append(item_text)
+
+            # Add buttons for this generation
+            lines.append("")  # Spacing
+
+        lines.append(f"\n{T(lang, 'history_page', page=page + 1, total=total_pages)}")
+        lines.append(T(lang, "history_month_limit"))
+
+        text = "\n".join(lines)
+
+        # Build keyboard with pagination and download buttons
+        kb_rows = []
+
+        # Add download/use buttons for each generation on this page
+        for i, gen in enumerate(page_gens):
+            row = [
+                InlineKeyboardButton(
+                    text=f"{T(lang, 'btn_download')} #{start_idx + i + 1}",
+                    callback_data=f"hist:download:{gen.id}"
+                ),
+                InlineKeyboardButton(
+                    text=f"{T(lang, 'btn_use_as_base')} #{start_idx + i + 1}",
+                    callback_data=f"hist:use_base:{gen.id}"
+                ),
+            ]
+            kb_rows.append(row)
+
+        # Pagination buttons
+        nav_row = []
+        if page > 0:
+            nav_row.append(
+                InlineKeyboardButton(text=T(lang, "btn_prev_page"), callback_data=f"account:history:{page - 1}")
+            )
+        if page < total_pages - 1:
+            nav_row.append(
+                InlineKeyboardButton(text=T(lang, "btn_next_page"), callback_data=f"account:history:{page + 1}")
+            )
+        if nav_row:
+            kb_rows.append(nav_row)
+
+        # Back button
+        kb_rows.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
+
+        kb = InlineKeyboardMarkup(inline_keyboard=kb_rows)
+
+        try:
+            await q.message.edit_text(text, reply_markup=kb)
+        except Exception:
+            await q.message.answer(text, reply_markup=kb)
+        await q.answer()
+
+    @r.callback_query(F.data.startswith("hist:download:"))
+    async def on_history_download(q: CallbackQuery):
+        """Download images from a generation."""
+        lang = await get_lang(q, db)
+        gen_id = int(q.data.split(":")[-1])
+
+        async with db.session() as s:
+            # Get generation and its images
+            gen = (await s.execute(select(Generation).where(Generation.id == gen_id))).scalar_one_or_none()
+
+            if not gen or gen.user_id != q.from_user.id:
+                await q.answer("Generation not found", show_alert=True)
+                return
+
+            # Get images
+            images = (
+                await s.execute(
+                    select(GeneratedImage).where(GeneratedImage.generation_id == gen_id)
+                )
+            ).scalars().all()
+
+        if not images:
+            await q.answer("No images found", show_alert=True)
+            return
+
+        await q.answer("Downloading...")
+
+        # Download and send images
+        for i, img in enumerate(images):
+            try:
+                # Download from storage_url
+                img_bytes = await asyncio.to_thread(seedream.download_file_bytes, img.storage_url)
+
+                # Send as document
+                from aiogram.types import BufferedInputFile
+                await q.message.answer_document(
+                    document=BufferedInputFile(img_bytes, filename=f"generation_{gen_id}_{i + 1}.png"),
+                    caption=f"Generation #{gen_id} - Image {i + 1}/{len(images)}"
+                )
+            except Exception as e:
+                logger.exception(f"Failed to download image {img.id}", exc_info=e)
+
+    @r.callback_query(F.data.startswith("hist:use_base:"))
+    async def on_history_use_as_base(q: CallbackQuery, state: FSMContext):
+        """Use a historical generation as base for angles/poses stage."""
+        lang = await get_lang(q, db)
+        gen_id = int(q.data.split(":")[-1])
+
+        async with db.session() as s:
+            # Get generation and its images
+            gen = (await s.execute(select(Generation).where(Generation.id == gen_id))).scalar_one_or_none()
+
+            if not gen or gen.user_id != q.from_user.id:
+                await q.answer("Generation not found", show_alert=True)
+                return
+
+            # Get images
+            images = (
+                await s.execute(
+                    select(GeneratedImage).where(GeneratedImage.generation_id == gen_id)
+                )
+            ).scalars().all()
+
+        if not images:
+            await q.answer("No images found", show_alert=True)
+            return
+
+        # Download image bytes for state
+        img_bytes = await asyncio.to_thread(seedream.download_file_bytes, images[0].storage_url)
+
+        # Initialize angles/poses stage with this as base photo
+        base_photo = {
+            "url": images[0].storage_url,
+            "bytes": img_bytes,
+            "generation_id": gen_id,
+            "background": (gen.params or {}).get("background", "white"),
+            "hair": (gen.params or {}).get("hair", "any"),
+            "style": (gen.params or {}).get("style", "casual"),
+            "aspect": (gen.params or {}).get("aspect", "3_4"),
+        }
+
+        await state.update_data(
+            base_photos=[base_photo],
+            current_base_index=0,
         # Assuming 1 generation = 10 rubles (you can adjust this)
         PRICE_PER_GEN = 10
 
@@ -580,11 +933,16 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
         await q.answer("Starting angles/poses stage...")
         await _show_angles_poses_menu(q.message, state, lang, db)
+        await state.set_state(GenerationFlow.angles_poses_menu)
+
+        await q.answer("Starting angles/poses stage...")
+        await _show_angles_poses_menu(q.message, state, lang, db)
 
     # --- /buy (пополнение звездами) ---
 
     @r.message(Command("buy"))
     async def cmd_buy(m: Message, state: FSMContext):
+        """Show payment method selection for top-up."""
         """Show payment method selection for top-up."""
         lang = await get_lang(m, db)
         await _show_payment_method_selection(m, lang)
@@ -595,12 +953,215 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     async def on_pay_stars(q: CallbackQuery, state: FSMContext):
         """Handle Telegram Stars payment selection."""
         lang = await get_lang(q, db)
+        await _show_payment_method_selection(m, lang)
+
+    # --- Payment method selection callbacks ---
+
+    @r.callback_query(F.data == "pay:stars")
+    async def on_pay_stars(q: CallbackQuery, state: FSMContext):
+        """Handle Telegram Stars payment selection."""
+        lang = await get_lang(q, db)
         await pay.send_invoice(
+            q.message,
             q.message,
             state=state,
             title=T(lang, "invoice_title"),
             desc=T(lang, "invoice_desc"),
             stars=1,
+            payload=f"demo:{q.from_user.id}",
+        )
+        await q.answer()
+
+    @r.callback_query(F.data == "pay:yookassa")
+    async def on_pay_yookassa(q: CallbackQuery, state: FSMContext):
+        """Handle YooKassa payment selection - create payment and show link."""
+        lang = await get_lang(q, db)
+
+        if not yookassa.enabled:
+            await q.message.answer(T(lang, "yookassa_not_configured"))
+            await q.answer()
+            return
+
+        await q.answer(T(lang, "yookassa_checking"))
+
+        # Payment parameters
+        # TODO: Add amount selection UI in future
+        amount = "100.00"  # 100 rubles
+        currency = "RUB"
+        description = T(lang, "invoice_title")
+        user_id = q.from_user.id
+
+        # Create payment
+        payment = yookassa.create_payment(
+            amount=amount,
+            currency=currency,
+            description=f"{description} (User ID: {user_id})",
+            user_id=user_id,
+        )
+
+        if not payment:
+            await q.message.answer(T(lang, "yookassa_payment_error"))
+            return
+
+        # Store payment ID in FSM for later checking
+        await state.update_data(yookassa_payment_id=payment["id"])
+
+        logger.info(
+            f"Created YooKassa payment {payment['id']} for user {user_id}, "
+            f"amount {amount} {currency}"
+        )
+
+        # Create keyboard with payment link and check button
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_pay_now"), url=payment["confirmation_url"]
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_check_payment"),
+                        callback_data=f"yookassa:check:{payment['id']}",
+                    )
+                ],
+            ]
+        )
+
+        # Send payment details
+        await q.message.answer(
+            T(
+                lang,
+                "yookassa_payment_created",
+                amount=payment["amount"],
+                currency=payment["currency"],
+                description=payment["description"],
+                payment_id=payment["id"],
+            ),
+            reply_markup=keyboard,
+        )
+
+    @r.callback_query(F.data.startswith("yookassa:check:"))
+    async def on_yookassa_check_payment(q: CallbackQuery, state: FSMContext):
+        """Check YooKassa payment status."""
+        lang = await get_lang(q, db)
+
+        # Parse payment ID from callback data
+        payment_id = q.data.split(":", 2)[2]
+        user_id = q.from_user.id
+
+        await q.answer(T(lang, "yookassa_checking"))
+
+        # Get payment status
+        payment = yookassa.get_payment_status(payment_id)
+
+        if not payment:
+            await q.message.answer(T(lang, "yookassa_check_error"))
+            return
+
+        logger.info(
+            f"Checked payment {payment_id} for user {user_id}: "
+            f"status={payment['status']}, paid={payment['paid']}"
+        )
+
+        status = payment["status"]
+        paid = payment["paid"]
+
+        # Handle different payment statuses
+        if status == "succeeded" and paid:
+            # Payment successful - update user balance
+            from decimal import Decimal
+
+            amount_rubles = Decimal(payment["amount"])
+            credits_to_add = int(amount_rubles)  # 1 ruble = 1 credit
+
+            async with db.session() as s:
+                # Update user credits
+                db_user = (
+                    await s.execute(select(User).where(User.user_id == user_id))
+                ).scalar_one_or_none()
+
+                if db_user:
+                    db_user.credits_balance = (db_user.credits_balance or 0) + credits_to_add
+
+                # Record transaction
+                await record_transaction(
+                    s,
+                    user_id=user_id,
+                    kind=TransactionKind.purchase,
+                    amount=amount_rubles,
+                    currency=payment["currency"],
+                    provider="yookassa",
+                    status=TransactionStatus.succeeded,
+                    title="YooKassa payment",
+                    external_id=payment_id,
+                    meta={"payment_status": status, "user_id": str(user_id)},
+                )
+
+                await s.commit()
+
+            logger.info(
+                f"Added {credits_to_add} credits to user {user_id} from YooKassa payment {payment_id}"
+            )
+
+            # Show success message
+            await q.message.edit_text(
+                T(
+                    lang,
+                    "yookassa_status_succeeded",
+                    amount=payment["amount"],
+                    currency=payment["currency"],
+                    payment_id=payment_id,
+                )
+            )
+
+        elif status == "canceled":
+            # Payment canceled - show option to create new payment
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_create_new_payment"),
+                            callback_data="pay:yookassa",
+                        )
+                    ]
+                ]
+            )
+
+            await q.message.edit_text(
+                T(lang, "yookassa_status_canceled"), reply_markup=keyboard
+            )
+
+        else:
+            # Payment still pending - show buttons again
+            status_text = T(lang, "yookassa_status_pending")
+            if status == "waiting_for_capture":
+                status_text = T(lang, "yookassa_status_waiting")
+
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_pay_now"),
+                            url=payment.get("confirmation_url", yookassa.return_url),
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_check_payment"),
+                            callback_data=f"yookassa:check:{payment_id}",
+                        )
+                    ],
+                ]
+            )
+
+            await q.message.edit_text(
+                f"{status_text}\n\n"
+                f"💰 Сумма: {payment['amount']} {payment['currency']}\n"
+                f"🆔 ID платежа: <code>{payment_id}</code>\n\n"
+                f"Оплатите и нажмите кнопку проверки.",
+                reply_markup=keyboard,
+            )
             payload=f"demo:{q.from_user.id}",
         )
         await q.answer()
