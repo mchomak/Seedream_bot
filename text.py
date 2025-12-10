@@ -38,6 +38,30 @@ phrases = {
         "payment_yookassa_desc": "Оплата банковской картой через YooKassa",
         "yookassa_not_configured": "❌ Оплата через YooKassa временно недоступна",
 
+        # YooKassa payment flow
+        "yookassa_payment_created": (
+            "🧾 <b>Платеж создан!</b>\n\n"
+            "💰 Сумма: {amount} {currency}\n"
+            "📝 Описание: {description}\n"
+            "🆔 ID платежа: <code>{payment_id}</code>\n\n"
+            "Нажмите кнопку ниже для перехода к оплате."
+        ),
+        "btn_pay_now": "💳 Перейти к оплате",
+        "btn_check_payment": "✅ Проверить оплату",
+        "yookassa_payment_error": "❌ Ошибка при создании платежа.\nПопробуйте позже.",
+        "yookassa_checking": "Проверяем статус платежа...",
+        "yookassa_status_pending": "⏳ Платеж ожидает оплаты",
+        "yookassa_status_waiting": "⏳ Платеж ожидает подтверждения",
+        "yookassa_status_succeeded": (
+            "✅ <b>Платеж успешно завершен!</b>\n\n"
+            "💰 Сумма: {amount} {currency}\n"
+            "🆔 ID платежа: <code>{payment_id}</code>\n\n"
+            "Спасибо за оплату! Баланс обновлен."
+        ),
+        "yookassa_status_canceled": "❌ Платеж отменен",
+        "yookassa_check_error": "❌ Ошибка при проверке платежа.\nПопробуйте позже.",
+        "btn_create_new_payment": "🔄 Создать новый платеж",
+
         # History view
         "history_title": "📜 <b>История генераций</b>",
         "history_empty": "У вас пока нет завершённых генераций.",
@@ -414,6 +438,30 @@ phrases = {
         "payment_stars_desc": "Payment via Telegram Stars",
         "payment_yookassa_desc": "Bank card payment via YooKassa",
         "yookassa_not_configured": "❌ YooKassa payment is temporarily unavailable",
+
+        # YooKassa payment flow
+        "yookassa_payment_created": (
+            "🧾 <b>Payment Created!</b>\n\n"
+            "💰 Amount: {amount} {currency}\n"
+            "📝 Description: {description}\n"
+            "🆔 Payment ID: <code>{payment_id}</code>\n\n"
+            "Click the button below to proceed with payment."
+        ),
+        "btn_pay_now": "💳 Proceed to Payment",
+        "btn_check_payment": "✅ Check Payment Status",
+        "yookassa_payment_error": "❌ Error creating payment.\nPlease try again later.",
+        "yookassa_checking": "Checking payment status...",
+        "yookassa_status_pending": "⏳ Payment pending",
+        "yookassa_status_waiting": "⏳ Payment awaiting confirmation",
+        "yookassa_status_succeeded": (
+            "✅ <b>Payment Successful!</b>\n\n"
+            "💰 Amount: {amount} {currency}\n"
+            "🆔 Payment ID: <code>{payment_id}</code>\n\n"
+            "Thank you! Your balance has been updated."
+        ),
+        "yookassa_status_canceled": "❌ Payment canceled",
+        "yookassa_check_error": "❌ Error checking payment status.\nPlease try again later.",
+        "btn_create_new_payment": "🔄 Create New Payment",
 
         # History view
         "history_title": "📜 <b>Generation History</b>",

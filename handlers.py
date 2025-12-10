@@ -34,7 +34,7 @@ from db import (
 )
 from fsm import PaymentFlow, set_waiting_payment, PaymentGuard
 from seedream_service import SeedreamService
-from yookassa_payment import YooKassaPay
+from yookassa_service import YooKassaService
 from config import *
 import asyncio
 import json
@@ -187,7 +187,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     r = Router()
     r.message.middleware(PaymentGuard())
     pay = StarsPay(db)
-    yookassa = YooKassaPay(db)
+    yookassa = YooKassaService()
 
 
     # --- /start ---
@@ -606,7 +606,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
 
     @r.callback_query(F.data == "pay:yookassa")
     async def on_pay_yookassa(q: CallbackQuery, state: FSMContext):
-        """Handle YooKassa payment selection."""
+        """Handle YooKassa payment selection - create payment and show link."""
         lang = await get_lang(q, db)
 
         if not yookassa.enabled:
@@ -614,18 +614,186 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
             await q.answer()
             return
 
-        # TODO: Add amount selection UI
-        # For now, use a default amount of 100 rubles
-        amount_rubles = 100.0
-        description = T(lang, "invoice_title")
+        await q.answer(T(lang, "yookassa_checking"))
 
-        await yookassa.send_payment_link(
-            q.message,
-            state,
-            amount_rubles=amount_rubles,
-            description=description,
+        # Payment parameters
+        # TODO: Add amount selection UI in future
+        amount = "100.00"  # 100 rubles
+        currency = "RUB"
+        description = T(lang, "invoice_title")
+        user_id = q.from_user.id
+
+        # Create payment
+        payment = yookassa.create_payment(
+            amount=amount,
+            currency=currency,
+            description=f"{description} (User ID: {user_id})",
+            user_id=user_id,
         )
-        await q.answer()
+
+        if not payment:
+            await q.message.answer(T(lang, "yookassa_payment_error"))
+            return
+
+        # Store payment ID in FSM for later checking
+        await state.update_data(yookassa_payment_id=payment["id"])
+
+        logger.info(
+            f"Created YooKassa payment {payment['id']} for user {user_id}, "
+            f"amount {amount} {currency}"
+        )
+
+        # Create keyboard with payment link and check button
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_pay_now"), url=payment["confirmation_url"]
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=T(lang, "btn_check_payment"),
+                        callback_data=f"yookassa:check:{payment['id']}",
+                    )
+                ],
+            ]
+        )
+
+        # Send payment details
+        await q.message.answer(
+            T(
+                lang,
+                "yookassa_payment_created",
+                amount=payment["amount"],
+                currency=payment["currency"],
+                description=payment["description"],
+                payment_id=payment["id"],
+            ),
+            reply_markup=keyboard,
+        )
+
+    @r.callback_query(F.data.startswith("yookassa:check:"))
+    async def on_yookassa_check_payment(q: CallbackQuery, state: FSMContext):
+        """Check YooKassa payment status."""
+        lang = await get_lang(q, db)
+
+        # Parse payment ID from callback data
+        payment_id = q.data.split(":", 2)[2]
+        user_id = q.from_user.id
+
+        await q.answer(T(lang, "yookassa_checking"))
+
+        # Get payment status
+        payment = yookassa.get_payment_status(payment_id)
+
+        if not payment:
+            await q.message.answer(T(lang, "yookassa_check_error"))
+            return
+
+        logger.info(
+            f"Checked payment {payment_id} for user {user_id}: "
+            f"status={payment['status']}, paid={payment['paid']}"
+        )
+
+        status = payment["status"]
+        paid = payment["paid"]
+
+        # Handle different payment statuses
+        if status == "succeeded" and paid:
+            # Payment successful - update user balance
+            from decimal import Decimal
+
+            amount_rubles = Decimal(payment["amount"])
+            credits_to_add = int(amount_rubles)  # 1 ruble = 1 credit
+
+            async with db.session() as s:
+                # Update user credits
+                db_user = (
+                    await s.execute(select(User).where(User.user_id == user_id))
+                ).scalar_one_or_none()
+
+                if db_user:
+                    db_user.credits_balance = (db_user.credits_balance or 0) + credits_to_add
+
+                # Record transaction
+                await record_transaction(
+                    s,
+                    user_id=user_id,
+                    kind=TransactionKind.purchase,
+                    amount=amount_rubles,
+                    currency=payment["currency"],
+                    provider="yookassa",
+                    status=TransactionStatus.succeeded,
+                    title="YooKassa payment",
+                    external_id=payment_id,
+                    meta={"payment_status": status, "user_id": str(user_id)},
+                )
+
+                await s.commit()
+
+            logger.info(
+                f"Added {credits_to_add} credits to user {user_id} from YooKassa payment {payment_id}"
+            )
+
+            # Show success message
+            await q.message.edit_text(
+                T(
+                    lang,
+                    "yookassa_status_succeeded",
+                    amount=payment["amount"],
+                    currency=payment["currency"],
+                    payment_id=payment_id,
+                )
+            )
+
+        elif status == "canceled":
+            # Payment canceled - show option to create new payment
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_create_new_payment"),
+                            callback_data="pay:yookassa",
+                        )
+                    ]
+                ]
+            )
+
+            await q.message.edit_text(
+                T(lang, "yookassa_status_canceled"), reply_markup=keyboard
+            )
+
+        else:
+            # Payment still pending - show buttons again
+            status_text = T(lang, "yookassa_status_pending")
+            if status == "waiting_for_capture":
+                status_text = T(lang, "yookassa_status_waiting")
+
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_pay_now"),
+                            url=payment.get("confirmation_url", yookassa.return_url),
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            text=T(lang, "btn_check_payment"),
+                            callback_data=f"yookassa:check:{payment_id}",
+                        )
+                    ],
+                ]
+            )
+
+            await q.message.edit_text(
+                f"{status_text}\n\n"
+                f"💰 Сумма: {payment['amount']} {payment['currency']}\n"
+                f"🆔 ID платежа: <code>{payment_id}</code>\n\n"
+                f"Оплатите и нажмите кнопку проверки.",
+                reply_markup=keyboard,
+            )
 
     # --- /language (и /lang, /swith_lang для совместимости) ---
 
