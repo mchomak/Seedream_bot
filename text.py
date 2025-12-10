@@ -256,6 +256,34 @@ phrases = {
         "no_more_photos": "Больше нет фотографий в очереди.",
         "all_photos_reviewed": "Все фотографии просмотрены. У вас есть {approved} утверждённых фото.",
         "moving_to_angles": "Переход к выбору новых ракурсов и поз...",
+
+        # Angles and poses stage
+        "angles_intro": "Добавьте новые позы и ракурсы для создания профиля товара на основе этого фото.",
+        "angles_base_photo": "Базовое фото:",
+        "btn_change_pose": "🧍 Сменить позу",
+        "btn_change_pose_5x": "🧍🧍🧍 Сменить позу 5 раз",
+        "btn_change_angle": "📐 Сменить ракурс",
+        "btn_change_angle_5x": "📐📐📐 Сменить ракурс 5 раз",
+        "btn_add_rear_view": "🔄 Добавить вид сзади",
+        "btn_full_body": "👤 В полный рост (бета)",
+        "btn_upper_body": "👔 Верх тела (бета)",
+        "btn_lower_body": "👖 Низ тела (бета)",
+        "btn_finish_photo": "✅ Завершить",
+
+        "rear_view_prompt": "Загрузите фото этой вещи сзади",
+        "btn_no_rear_photo": "❌ У меня нет фото сзади (менее эффективно)",
+
+        "variant_result": "Результат генерации:",
+        "btn_redo_variant": "🔄 Переделать",
+        "btn_continue_variants": "➡️ Продолжить",
+
+        "confirm_finish_photo": "Вы уверены, что хотите завершить работу с этим фото?",
+        "btn_yes_finish": "✅ Да, завершить",
+        "btn_no_continue": "❌ Нет, продолжить",
+
+        "moving_to_next_base": "Переход к следующему базовому фото...",
+        "all_base_photos_complete": "Все базовые фотографии обработаны!",
+
         "upload_doc_only": "Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия).",
         "upload_doc_wrong_type": "Это не похоже на изображение. Пожалуйста, отправьте фотографию одежды как документ (файл).",
 
@@ -562,6 +590,33 @@ phrases = {
         "no_more_photos": "No more photos in queue.",
         "all_photos_reviewed": "All photos reviewed. You have {approved} approved photo(s).",
         "moving_to_angles": "Moving to new angles and poses selection...",
+
+        # Angles and poses stage
+        "angles_intro": "Add new poses and camera angles to create a product profile based on this photo.",
+        "angles_base_photo": "Base photo:",
+        "btn_change_pose": "🧍 Change pose",
+        "btn_change_pose_5x": "🧍🧍🧍 Change pose 5 times",
+        "btn_change_angle": "📐 Change angle",
+        "btn_change_angle_5x": "📐📐📐 Change angle 5 times",
+        "btn_add_rear_view": "🔄 Add rear view",
+        "btn_full_body": "👤 Full body (beta)",
+        "btn_upper_body": "👔 Upper body (beta)",
+        "btn_lower_body": "👖 Lower body (beta)",
+        "btn_finish_photo": "✅ Finish",
+
+        "rear_view_prompt": "Upload a photo of this item from behind",
+        "btn_no_rear_photo": "❌ I don't have a photo from behind (less effective)",
+
+        "variant_result": "Generation result:",
+        "btn_redo_variant": "🔄 Redo",
+        "btn_continue_variants": "➡️ Continue",
+
+        "confirm_finish_photo": "Are you sure you want to finish with this photo?",
+        "btn_yes_finish": "✅ Yes, finish",
+        "btn_no_continue": "❌ No, continue",
+
+        "moving_to_next_base": "Moving to next base photo...",
+        "all_base_photos_complete": "All base photos processed!",
 
         "upload_doc_only": "Please send the photo as a document in original quality (without compression).",
         "upload_doc_wrong_type": "This does not look like an image. Please send the clothing photo as a document (file).",
