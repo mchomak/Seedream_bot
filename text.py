@@ -11,6 +11,41 @@ phrases = {
         ),
         "help_header": "Доступные команды",
 
+        # Persistent keyboard buttons
+        "kb_generation": "🎨 Генерация",
+        "kb_my_account": "👤 Мой аккаунт",
+        "kb_examples": "📸 Примеры",
+
+        # Account menu
+        "account_menu": "👤 <b>Мой аккаунт</b>\n\nВыберите раздел:",
+        "btn_balance": "💰 Баланс",
+        "btn_history": "📜 История",
+        "btn_back": "◀️ Назад",
+
+        # Balance view
+        "balance_title": "💰 <b>Ваш баланс</b>",
+        "balance_generations": "Генераций: <b>{count}</b>",
+        "balance_rubles": "Рублей: <b>{amount} ₽</b>",
+        "balance_price_per_gen": "Стоимость 1 генерации: <b>{price} ₽</b>",
+        "btn_topup": "💳 Пополнить баланс",
+
+        # History view
+        "history_title": "📜 <b>История генераций</b>",
+        "history_empty": "У вас пока нет завершённых генераций.",
+        "history_item": (
+            "📅 {date}\n"
+            "⏰ {time}\n"
+            "💰 Стоимость: {cost} кредитов\n"
+            "📝 Параметры: {params}\n"
+            "🖼 Изображений: {images_count}"
+        ),
+        "btn_download": "⬇️ Скачать",
+        "btn_use_as_base": "🎨 Использовать как базу",
+        "btn_prev_page": "◀️ Назад",
+        "btn_next_page": "Вперёд ▶️",
+        "history_page": "Страница {page} из {total}",
+        "history_month_limit": "Показаны генерации за последний месяц",
+
         # --- описания команд в /help и меню бота ---
         "help_items": {
             "start": "Сбросить состояние и показать приветственное сообщение",
@@ -345,6 +380,42 @@ phrases = {
             "and top up balance with Telegram Stars."
         ),
         "help_header": "Available commands",
+
+        # Persistent keyboard buttons
+        "kb_generation": "🎨 Generation",
+        "kb_my_account": "👤 My Account",
+        "kb_examples": "📸 Examples",
+
+        # Account menu
+        "account_menu": "👤 <b>My Account</b>\n\nChoose a section:",
+        "btn_balance": "💰 Balance",
+        "btn_history": "📜 History",
+        "btn_back": "◀️ Back",
+
+        # Balance view
+        "balance_title": "💰 <b>Your Balance</b>",
+        "balance_generations": "Generations: <b>{count}</b>",
+        "balance_rubles": "Rubles: <b>{amount} ₽</b>",
+        "balance_price_per_gen": "Price per generation: <b>{price} ₽</b>",
+        "btn_topup": "💳 Top Up Balance",
+
+        # History view
+        "history_title": "📜 <b>Generation History</b>",
+        "history_empty": "You don't have any completed generations yet.",
+        "history_item": (
+            "📅 {date}\n"
+            "⏰ {time}\n"
+            "💰 Cost: {cost} credits\n"
+            "📝 Parameters: {params}\n"
+            "🖼 Images: {images_count}"
+        ),
+        "btn_download": "⬇️ Download",
+        "btn_use_as_base": "🎨 Use as Base",
+        "btn_prev_page": "◀️ Previous",
+        "btn_next_page": "Next ▶️",
+        "history_page": "Page {page} of {total}",
+        "history_month_limit": "Showing generations from the last month",
+
         "multi_items_intro": (
             "You have uploaded {count} items.\n\n"
             "Next you will choose background, model gender, age, hair color, "
