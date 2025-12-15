@@ -11,11 +11,23 @@
         .sidebar { min-height: 100vh; background: #343a40; }
         .sidebar a { color: #adb5bd; padding: 10px 20px; display: block; text-decoration: none; }
         .sidebar a:hover, .sidebar a.active { background: #495057; color: #fff; }
+        .sidebar .nav-section { color: #6c757d; font-size: 0.75rem; text-transform: uppercase; padding: 15px 20px 5px; letter-spacing: 0.5px; }
         .main-content { padding: 20px; }
         .stat-card { border-left: 4px solid #007bff; }
+        .stat-card.success { border-left-color: #28a745; }
+        .stat-card.warning { border-left-color: #ffc107; }
+        .stat-card.danger { border-left-color: #dc3545; }
+        .stat-card.info { border-left-color: #17a2b8; }
         .stat-card .card-body { padding: 1.5rem; }
         .stat-card .stat-value { font-size: 2rem; font-weight: bold; color: #007bff; }
+        .stat-card.success .stat-value { color: #28a745; }
+        .stat-card.warning .stat-value { color: #ffc107; }
+        .stat-card.danger .stat-value { color: #dc3545; }
+        .stat-card.info .stat-value { color: #17a2b8; }
         .stat-card .stat-label { color: #6c757d; text-transform: uppercase; font-size: 0.875rem; }
+        .chart-container { position: relative; height: 300px; }
+        .badge-frozen { background-color: #6c757d; }
+        .badge-suspicious { background-color: #dc3545; }
     </style>
 </head>
 <body>
@@ -34,31 +46,71 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if '/analytics' in request.url.path %}active{% endif %}" href="/admin/analytics">
+                                <i class="fas fa-chart-bar"></i> Analytics
+                            </a>
+                        </li>
+
+                        <div class="nav-section">Users</div>
+                        <li class="nav-item">
                             <a class="nav-link {% if '/users' in request.url.path %}active{% endif %}" href="/admin/users">
                                 <i class="fas fa-users"></i> Users
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/broadcast' in request.url.path %}active{% endif %}" href="/admin/broadcast">
+                                <i class="fas fa-bullhorn"></i> Broadcast
+                            </a>
+                        </li>
+
+                        <div class="nav-section">Finance</div>
                         <li class="nav-item">
                             <a class="nav-link {% if '/transactions' in request.url.path %}active{% endif %}" href="/admin/transactions">
                                 <i class="fas fa-dollar-sign"></i> Transactions
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if '/settings' in request.url.path %}active{% endif %}" href="/admin/settings">
+                                <i class="fas fa-tags"></i> Tariffs & Settings
+                            </a>
+                        </li>
+
+                        <div class="nav-section">System</div>
+                        <li class="nav-item">
                             <a class="nav-link {% if '/logs' in request.url.path %}active{% endif %}" href="/admin/logs">
                                 <i class="fas fa-list"></i> Admin Logs
                             </a>
                         </li>
-                        <li class="nav-item mt-3">
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/backups' in request.url.path %}active{% endif %}" href="/admin/backups">
+                                <i class="fas fa-database"></i> Backups
+                            </a>
+                        </li>
+
+                        <div class="nav-section">Export</div>
+                        <li class="nav-item">
                             <a class="nav-link" href="/admin/export/users">
-                                <i class="fas fa-download"></i> Export Users CSV
+                                <i class="fas fa-download"></i> Export Users
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="/admin/export/transactions">
-                                <i class="fas fa-download"></i> Export Transactions CSV
+                                <i class="fas fa-download"></i> Export Transactions
                             </a>
                         </li>
-                        <li class="nav-item mt-3">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/export/generations">
+                                <i class="fas fa-download"></i> Export Generations
+                            </a>
+                        </li>
+
+                        <div class="nav-section">Account</div>
+                        <li class="nav-item">
+                            <a class="nav-link {% if '/profile' in request.url.path %}active{% endif %}" href="/admin/profile">
+                                <i class="fas fa-user-cog"></i> Profile
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link text-danger" href="/admin/logout">
                                 <i class="fas fa-sign-out-alt"></i> Logout
                             </a>
@@ -74,6 +126,7 @@
                     <h1 class="h2">{% block heading %}Admin Panel{% endblock %}</h1>
                     <span class="text-muted">
                         <i class="fas fa-user-circle"></i> {{ admin.username }}
+                        {% if admin.is_superuser %}<span class="badge bg-primary">Super</span>{% endif %}
                     </span>
                 </div>
                 {% endif %}

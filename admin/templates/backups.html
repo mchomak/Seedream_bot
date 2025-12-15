@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Backups - Seedream Admin{% endblock %}
+{% block heading %}Database Backups{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-plus"></i> Create Backup</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Create a full database backup. This will save a copy of all data.</p>
+                <form method="post" action="/admin/backups/create">
+                    <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Create a new database backup?');">
+                        <i class="fas fa-database"></i> Create Backup Now
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Backup Info</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>Storage Location:</strong></p>
+                <code>data/backups/</code>
+                <hr>
+                <p class="mb-0 text-muted small">
+                    Backups are created using pg_dump and stored as SQL files.
+                    Regular backups are recommended for data safety.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-history"></i> Backup History</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Filename</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for backup in backups %}
+                            <tr>
+                                <td>
+                                    <code>{{ backup.filename }}</code>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if backup.backup_type == 'full' %}primary{% else %}secondary{% endif %}">
+                                        {{ backup.backup_type }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if backup.file_size %}
+                                        {% if backup.file_size > 1048576 %}
+                                            {{ "%.2f"|format(backup.file_size / 1048576) }} MB
+                                        {% elif backup.file_size > 1024 %}
+                                            {{ "%.2f"|format(backup.file_size / 1024) }} KB
+                                        {% else %}
+                                            {{ backup.file_size }} bytes
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if backup.status == 'completed' %}success{% else %}danger{% endif %}">
+                                        {{ backup.status }}
+                                    </span>
+                                    {% if backup.error_message %}
+                                    <br><small class="text-danger">{{ backup.error_message[:50] }}...</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ backup.created_at.strftime('%Y-%m-%d %H:%M') if backup.created_at else 'N/A' }}</small>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">No backups yet</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
