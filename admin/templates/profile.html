@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Seedream Admin{% endblock %}
+{% block heading %}Profile{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-user"></i> Account Information</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted" width="40%">Username:</td>
+                        <td><strong>{{ admin.username }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Email:</td>
+                        <td>{{ admin.email or 'Not set' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Role:</td>
+                        <td>
+                            {% if admin.is_superuser %}
+                            <span class="badge bg-primary">Superuser</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Admin</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Last Login:</td>
+                        <td>{{ admin.last_login.strftime('%Y-%m-%d %H:%M:%S') if admin.last_login else 'Never' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Created:</td>
+                        <td>{{ admin.created_at.strftime('%Y-%m-%d %H:%M:%S') if admin.created_at else 'N/A' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="fas fa-key"></i> Change Password</h5>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                {% if success %}
+                <div class="alert alert-success">{{ success }}</div>
+                {% endif %}
+
+                <form method="post" action="/admin/change-password">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required minlength="8">
+                        <div class="form-text">Minimum 8 characters</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="8">
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="fas fa-save"></i> Change Password
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
