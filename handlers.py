@@ -197,7 +197,6 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     # --- /start ---
     @r.message(Command("start"))
     async def cmd_start(m: Message, state: FSMContext):
-    async def cmd_start(m: Message, state: FSMContext):
         async with db.session() as s:
             await upsert_user_basic(
                 s,
@@ -304,13 +303,6 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     async def on_account_back(q: CallbackQuery):
         await q.message.delete()
         await q.answer()
-
-    @r.callback_query(F.data == "account:balance")
-    async def on_account_balance(q: CallbackQuery):
-        """Show balance view."""
-        lang = await get_lang(q, db)
-
-        await _show_account_menu(m, lang)
 
     # Handle keyboard button presses
     @r.message(F.text.in_([phrases["ru"]["kb_my_account"], phrases["en"]["kb_my_account"]]))
@@ -638,8 +630,12 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
         await state.update_data(
             base_photos=[base_photo],
             current_base_index=0,
+        )
         # Assuming 1 generation = 10 rubles (you can adjust this)
         PRICE_PER_GEN = 10
+
+        async with db.session() as s:
+            prof = await get_profile(s, tg_user_id=q.from_user.id)
 
         text = (
             f"{T(lang, 'balance_title')}\n\n"
@@ -953,16 +949,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
     async def on_pay_stars(q: CallbackQuery, state: FSMContext):
         """Handle Telegram Stars payment selection."""
         lang = await get_lang(q, db)
-        await _show_payment_method_selection(m, lang)
-
-    # --- Payment method selection callbacks ---
-
-    @r.callback_query(F.data == "pay:stars")
-    async def on_pay_stars(q: CallbackQuery, state: FSMContext):
-        """Handle Telegram Stars payment selection."""
-        lang = await get_lang(q, db)
         await pay.send_invoice(
-            q.message,
             q.message,
             state=state,
             title=T(lang, "invoice_title"),
@@ -1162,8 +1149,7 @@ def build_router(db: Database, seedream: SeedreamService) -> Router:
                 f"Оплатите и нажмите кнопку проверки.",
                 reply_markup=keyboard,
             )
-            payload=f"demo:{q.from_user.id}",
-        )
+
         await q.answer()
 
     @r.callback_query(F.data == "pay:yookassa")
