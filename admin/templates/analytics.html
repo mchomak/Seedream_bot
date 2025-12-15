@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Seedream Admin{% endblock %}
+{% block heading %}Analytics{% endblock %}
+
+{% block content %}
+<!-- Period Filter -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="btn-group">
+            <a href="/admin/analytics?period=7d" class="btn btn-{% if period == '7d' %}primary{% else %}outline-primary{% endif %}">7 Days</a>
+            <a href="/admin/analytics?period=30d" class="btn btn-{% if period == '30d' %}primary{% else %}outline-primary{% endif %}">30 Days</a>
+            <a href="/admin/analytics?period=90d" class="btn btn-{% if period == '90d' %}primary{% else %}outline-primary{% endif %}">90 Days</a>
+        </div>
+        <span class="ms-3 text-muted">Total Credits in System: <strong>{{ total_credits }}</strong></span>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-chart-line text-success"></i> Revenue Dynamics</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-images text-primary"></i> Generations</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="generationsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-pie-chart text-warning"></i> Generation Types</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="genTypesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-users text-info"></i> User Cohorts (Weekly)</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="cohortsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Count Chart -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-shopping-cart text-success"></i> Daily Transactions</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="txCountChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartData = {{ chart_data | safe }};
+
+// Revenue Chart
+new Chart(document.getElementById('revenueChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: chartData.dates,
+        datasets: [{
+            label: 'Revenue',
+            data: chartData.revenue,
+            borderColor: 'rgb(40, 167, 69)',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// Generations Chart
+new Chart(document.getElementById('generationsChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: chartData.gen_dates,
+        datasets: [
+            {
+                label: 'Total',
+                data: chartData.gen_total,
+                borderColor: 'rgb(0, 123, 255)',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: false,
+                tension: 0.4
+            },
+            {
+                label: 'Successful',
+                data: chartData.gen_success,
+                borderColor: 'rgb(40, 167, 69)',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                fill: false,
+                tension: 0.4
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// Generation Types Chart
+const genTypesLabels = Object.keys(chartData.gen_types);
+const genTypesValues = Object.values(chartData.gen_types);
+new Chart(document.getElementById('genTypesChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: genTypesLabels,
+        datasets: [{
+            data: genTypesValues,
+            backgroundColor: [
+                'rgba(0, 123, 255, 0.7)',
+                'rgba(40, 167, 69, 0.7)',
+                'rgba(255, 193, 7, 0.7)',
+                'rgba(220, 53, 69, 0.7)',
+                'rgba(23, 162, 184, 0.7)',
+                'rgba(108, 117, 125, 0.7)',
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'right' }
+        }
+    }
+});
+
+// Cohorts Chart
+new Chart(document.getElementById('cohortsChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: chartData.cohort_dates,
+        datasets: [{
+            label: 'New Users',
+            data: chartData.cohort_counts,
+            backgroundColor: 'rgba(23, 162, 184, 0.7)',
+            borderColor: 'rgb(23, 162, 184)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// Transactions Count Chart
+new Chart(document.getElementById('txCountChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: chartData.dates,
+        datasets: [{
+            label: 'Transactions',
+            data: chartData.tx_count,
+            backgroundColor: 'rgba(40, 167, 69, 0.6)',
+            borderColor: 'rgb(40, 167, 69)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+</script>
+{% endblock %}

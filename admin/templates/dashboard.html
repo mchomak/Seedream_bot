@@ -4,7 +4,7 @@
 {% block heading %}Dashboard{% endblock %}
 
 {% block content %}
-<!-- Stats Cards -->
+<!-- Main Stats Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
         <div class="card stat-card">
@@ -15,33 +15,86 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card">
+        <div class="card stat-card success">
             <div class="card-body">
-                <div class="stat-label">Active Users (30d)</div>
-                <div class="stat-value">{{ stats.active_users }}</div>
+                <div class="stat-label">Active (30d)</div>
+                <div class="stat-value">{{ stats.active_30d }}</div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card">
+        <div class="card stat-card warning">
             <div class="card-body">
                 <div class="stat-label">Total Revenue</div>
-                <div class="stat-value">{{ "%.2f"|format(stats.total_revenue) }} ₽</div>
+                <div class="stat-value">{{ "%.0f"|format(stats.total_revenue) }}</div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card stat-card">
+        <div class="card stat-card info">
             <div class="card-body">
                 <div class="stat-label">Avg Check</div>
-                <div class="stat-value">{{ "%.2f"|format(stats.avg_check) }} ₽</div>
+                <div class="stat-value">{{ "%.0f"|format(stats.avg_check) }}</div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Conversion & Analytics Cards -->
 <div class="row mb-4">
-    <div class="col-md-4">
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">ARPU</div>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ "%.2f"|format(stats.arpu) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card success">
+            <div class="card-body">
+                <div class="stat-label">ARPPU</div>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ "%.2f"|format(stats.arppu) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card warning">
+            <div class="card-body">
+                <div class="stat-label">LTV</div>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ "%.2f"|format(stats.ltv) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card info">
+            <div class="card-body">
+                <div class="stat-label">Conv. to Pay</div>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ stats.conversion_to_payment }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="stat-label">Conv. to Gen</div>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ stats.conversion_to_generation }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card success">
+            <div class="card-body">
+                <div class="stat-label">Repeat Rate</div>
+                <div class="stat-value" style="font-size: 1.5rem;">{{ stats.repeat_rate }}%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generations Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
         <div class="card stat-card">
             <div class="card-body">
                 <div class="stat-label">Total Generations</div>
@@ -49,19 +102,55 @@
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card stat-card">
+    <div class="col-md-3">
+        <div class="card stat-card success">
             <div class="card-body">
                 <div class="stat-label">Successful</div>
                 <div class="stat-value">{{ stats.successful_generations }}</div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card stat-card">
+    <div class="col-md-3">
+        <div class="card stat-card info">
             <div class="card-body">
                 <div class="stat-label">Success Rate</div>
                 <div class="stat-value">{{ stats.success_rate }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning">
+            <div class="card-body">
+                <div class="stat-label">Credits Spent (30d)</div>
+                <div class="stat-value">{{ stats.credits_spent_30d }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-chart-line text-success"></i> Revenue (30 days)</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-user-plus text-primary"></i> New Users (30 days)</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="usersChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -94,6 +183,7 @@
                                     <span class="badge bg-{% if tx.status.value == 'succeeded' %}success{% elif tx.status.value == 'pending' %}warning{% else %}danger{% endif %}">
                                         {{ tx.status.value }}
                                     </span>
+                                    {% if tx.is_suspicious %}<span class="badge bg-danger">Suspicious</span>{% endif %}
                                 </td>
                                 <td><small>{{ tx.created_at.strftime('%Y-%m-%d %H:%M') if tx.created_at else 'N/A' }}</small></td>
                             </tr>
@@ -105,7 +195,7 @@
                 </div>
             </div>
             <div class="card-footer bg-white text-center">
-                <a href="/admin/transactions" class="text-decoration-none">View all transactions →</a>
+                <a href="/admin/transactions" class="text-decoration-none">View all transactions</a>
             </div>
         </div>
     </div>
@@ -130,7 +220,10 @@
                             {% for user in recent_users %}
                             <tr>
                                 <td><a href="/admin/users/{{ user.id }}">{{ user.user_id }}</a></td>
-                                <td>{{ user.tg_username or 'N/A' }}</td>
+                                <td>
+                                    {{ user.tg_username or 'N/A' }}
+                                    {% if user.is_frozen %}<span class="badge bg-secondary">Frozen</span>{% endif %}
+                                </td>
                                 <td>{{ user.credits_balance or 0 }}</td>
                                 <td><small>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</small></td>
                             </tr>
@@ -142,9 +235,68 @@
                 </div>
             </div>
             <div class="card-footer bg-white text-center">
-                <a href="/admin/users" class="text-decoration-none">View all users →</a>
+                <a href="/admin/users" class="text-decoration-none">View all users</a>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartData = {{ chart_data | safe }};
+
+// Revenue Chart
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+new Chart(revenueCtx, {
+    type: 'line',
+    data: {
+        labels: chartData.revenue_dates,
+        datasets: [{
+            label: 'Revenue',
+            data: chartData.revenue_values,
+            borderColor: 'rgb(40, 167, 69)',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+
+// Users Chart
+const usersCtx = document.getElementById('usersChart').getContext('2d');
+new Chart(usersCtx, {
+    type: 'bar',
+    data: {
+        labels: chartData.users_dates,
+        datasets: [{
+            label: 'New Users',
+            data: chartData.users_values,
+            backgroundColor: 'rgba(0, 123, 255, 0.6)',
+            borderColor: 'rgb(0, 123, 255)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+</script>
 {% endblock %}

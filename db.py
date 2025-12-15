@@ -88,6 +88,10 @@ class User(Base):
 
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_frozen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # Account freeze status
+
+    # A/B testing group for tariff split testing
+    ab_test_group: Mapped[Optional[str]] = mapped_column(String(32))
 
     # Балансы
     credits_balance: Mapped[int] = mapped_column(
@@ -105,6 +109,8 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     last_seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    first_payment_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))  # For LTV calculation
+    first_generation_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))  # For conversion tracking
 
     subscribed_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     consent_privacy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -158,6 +164,10 @@ class Transaction(Base):
 
     provider: Mapped[Optional[str]] = mapped_column(String(64))
     title: Mapped[Optional[str]] = mapped_column(String(256))
+
+    # Suspicious payment flag for fraud detection
+    is_suspicious: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    suspicious_reason: Mapped[Optional[str]] = mapped_column(String(512))
 
     # Доп. данные по платёжке (response платёжки, raw-поля и т.п.)
     meta: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
@@ -361,6 +371,164 @@ class AdminActionLog(Base):
         Index("ix_admin_logs_admin_id", "admin_id"),
         Index("ix_admin_logs_created_at", "created_at"),
         Index("ix_admin_logs_action", "action"),
+    )
+
+
+class SystemSetting(Base):
+    """
+    System-wide settings stored in database.
+    Key-value storage for configuration that can be changed via admin panel.
+    """
+    __tablename__ = "system_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    value: Mapped[Optional[str]] = mapped_column(Text)  # JSON-encoded for complex values
+    description: Mapped[Optional[str]] = mapped_column(String(512))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TariffPackage(Base):
+    """
+    Tariff packages for purchasing credits.
+    Allows flexible pricing with package deals.
+    """
+    __tablename__ = "tariff_packages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    credits: Mapped[int] = mapped_column(Integer, nullable=False)  # Number of generations
+    price: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)  # Price in RUB
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB")
+
+    # For A/B testing
+    ab_test_group: Mapped[Optional[str]] = mapped_column(String(32))
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # Discount percentage (for display purposes)
+    discount_percent: Mapped[Optional[int]] = mapped_column(Integer)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        Index("ix_tariff_packages_active", "is_active"),
+        Index("ix_tariff_packages_ab_group", "ab_test_group"),
+    )
+
+
+class ScenarioPrice(Base):
+    """
+    Pricing for different generation scenarios.
+    Migrated from config.py GEN_SCENARIO_PRICES.
+    """
+    __tablename__ = "scenario_prices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scenario_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    credits_cost: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    description: Mapped[Optional[str]] = mapped_column(String(256))
+
+    # For A/B testing
+    ab_test_group: Mapped[Optional[str]] = mapped_column(String(32))
+
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class BroadcastMessage(Base):
+    """
+    Mass notification messages sent to users.
+    """
+    __tablename__ = "broadcast_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admin_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    message_text: Mapped[str] = mapped_column(Text, nullable=False)
+    target_type: Mapped[str] = mapped_column(String(32), nullable=False, default="all")  # all, active, inactive, ab_group
+    target_filter: Mapped[Optional[str]] = mapped_column(String(256))  # JSON filter criteria
+
+    total_recipients: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sent_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)  # pending, sending, completed, canceled
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (
+        Index("ix_broadcast_status", "status"),
+    )
+
+
+class Backup(Base):
+    """
+    Database backup records.
+    """
+    __tablename__ = "backups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    filename: Mapped[str] = mapped_column(String(256), nullable=False)
+    file_size: Mapped[Optional[int]] = mapped_column(BigInteger)
+    backup_type: Mapped[str] = mapped_column(String(32), nullable=False, default="full")  # full, incremental
+
+    admin_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    status: Mapped[str] = mapped_column(String(32), default="completed", nullable=False)  # completed, failed
+    error_message: Mapped[Optional[str]] = mapped_column(String(512))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
 
 

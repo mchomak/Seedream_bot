@@ -4,19 +4,30 @@
 {% block heading %}Users Management{% endblock %}
 
 {% block content %}
-<!-- Search and Stats -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <form method="get" action="/admin/users">
-            <div class="input-group">
-                <input type="text" class="form-control" name="search" placeholder="Search by ID or username..." value="{{ search }}">
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="/admin/users" class="row g-3">
+            <div class="col-md-6">
+                <input type="text" class="form-control" name="search" placeholder="Search by Telegram ID or username..." value="{{ search }}">
+            </div>
+            <div class="col-md-3">
+                <div class="form-check mt-2">
+                    <input type="checkbox" class="form-check-input" name="frozen_only" {% if frozen_only %}checked{% endif %}>
+                    <label class="form-check-label">Frozen accounts only</label>
+                </div>
+            </div>
+            <div class="col-md-3">
                 <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
+                <a href="/admin/users" class="btn btn-secondary">Clear</a>
             </div>
         </form>
     </div>
-    <div class="col-md-6 text-end">
-        <span class="badge bg-secondary fs-6">Total: {{ total_users }}</span>
-    </div>
+</div>
+
+<div class="d-flex justify-content-between mb-3">
+    <span class="badge bg-secondary fs-6">Total: {{ total_users }}</span>
+    <a href="/admin/export/users" class="btn btn-success btn-sm"><i class="fas fa-download"></i> Export CSV</a>
 </div>
 
 <!-- Users Table -->
@@ -28,7 +39,8 @@
                     <tr>
                         <th>Telegram ID</th>
                         <th>Username</th>
-                        <th>Credits Balance</th>
+                        <th>Credits</th>
+                        <th>Status</th>
                         <th>Language</th>
                         <th>Joined</th>
                         <th>Last Seen</th>
@@ -37,7 +49,7 @@
                 </thead>
                 <tbody>
                     {% for user in users %}
-                    <tr>
+                    <tr class="{% if user.is_frozen %}table-secondary{% endif %}">
                         <td><code>{{ user.user_id }}</code></td>
                         <td>
                             {% if user.tg_username %}
@@ -45,11 +57,19 @@
                             {% else %}
                             <span class="text-muted">N/A</span>
                             {% endif %}
+                            {% if user.is_premium %}<span class="badge bg-warning">Premium</span>{% endif %}
                         </td>
                         <td>
                             <span class="badge bg-{% if (user.credits_balance or 0) > 0 %}success{% else %}secondary{% endif %}">
                                 {{ user.credits_balance or 0 }}
                             </span>
+                        </td>
+                        <td>
+                            {% if user.is_frozen %}
+                            <span class="badge bg-danger">Frozen</span>
+                            {% else %}
+                            <span class="badge bg-success">Active</span>
+                            {% endif %}
                         </td>
                         <td>{{ user.lang or 'N/A' }}</td>
                         <td><small>{{ user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A' }}</small></td>
@@ -62,7 +82,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-5">
+                        <td colspan="8" class="text-center text-muted py-5">
                             <i class="fas fa-users fa-3x mb-3 d-block"></i>
                             No users found
                         </td>
@@ -78,21 +98,21 @@
     <div class="card-footer bg-white">
         <nav>
             <ul class="pagination justify-content-center mb-0">
-                <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                    <a class="page-link" href="?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}">Previous</a>
+                {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page - 1 }}&search={{ search }}&frozen_only={{ frozen_only }}">Previous</a>
                 </li>
-                {% for p in range(1, total_pages + 1) %}
-                    {% if p == page %}
-                        <li class="page-item active"><span class="page-link">{{ p }}</span></li>
-                    {% elif p <= 3 or p > total_pages - 3 or (p >= page - 2 and p <= page + 2) %}
-                        <li class="page-item"><a class="page-link" href="?page={{ p }}{% if search %}&search={{ search }}{% endif %}">{{ p }}</a></li>
-                    {% elif p == 4 or p == total_pages - 3 %}
-                        <li class="page-item disabled"><span class="page-link">...</span></li>
-                    {% endif %}
-                {% endfor %}
-                <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                    <a class="page-link" href="?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}">Next</a>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ page }} of {{ total_pages }}</span>
                 </li>
+
+                {% if page < total_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page + 1 }}&search={{ search }}&frozen_only={{ frozen_only }}">Next</a>
+                </li>
+                {% endif %}
             </ul>
         </nav>
     </div>
