@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Broadcast - Seedream Admin{% endblock %}
+{% block heading %}Broadcast Messages{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Send New Broadcast -->
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-bullhorn"></i> Send New Broadcast</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/admin/broadcast/send">
+                    <div class="mb-3">
+                        <label class="form-label">Target Audience</label>
+                        <select class="form-select" name="target_type">
+                            <option value="all">All Users ({{ total_users }})</option>
+                            <option value="active">Active Users - Last 30 days ({{ active_users }})</option>
+                            <option value="inactive">Inactive Users ({{ inactive_users }})</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Message</label>
+                        <textarea class="form-control" name="message" rows="5" required placeholder="Enter your message..."></textarea>
+                        <div class="form-text">Supports basic formatting. Use with caution - messages will be sent immediately.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Are you sure you want to send this broadcast?');">
+                        <i class="fas fa-paper-plane"></i> Send Broadcast
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-info-circle"></i> Audience Stats</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless mb-0">
+                    <tr>
+                        <td>Total Users:</td>
+                        <td><strong>{{ total_users }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Active (30 days):</td>
+                        <td><strong class="text-success">{{ active_users }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Inactive:</td>
+                        <td><strong class="text-muted">{{ inactive_users }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Broadcast History -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-history"></i> Broadcast History</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Target</th>
+                                <th>Sent/Failed</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for broadcast in broadcasts %}
+                            <tr>
+                                <td>
+                                    <small>{{ broadcast.created_at.strftime('%Y-%m-%d %H:%M') if broadcast.created_at else 'N/A' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if broadcast.target_type == 'all' %}primary{% elif broadcast.target_type == 'active' %}success{% else %}secondary{% endif %}">
+                                        {{ broadcast.target_type }}
+                                    </span>
+                                    <br><small class="text-muted">{{ broadcast.total_recipients }} recipients</small>
+                                </td>
+                                <td>
+                                    <span class="text-success">{{ broadcast.sent_count }}</span> /
+                                    <span class="text-danger">{{ broadcast.failed_count }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if broadcast.status == 'completed' %}success{% elif broadcast.status == 'sending' %}warning{% elif broadcast.status == 'pending' %}info{% else %}danger{% endif %}">
+                                        {{ broadcast.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td colspan="4">
+                                    <small class="text-muted">{{ broadcast.message_text[:100] }}{% if broadcast.message_text|length > 100 %}...{% endif %}</small>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="text-center text-muted py-3">No broadcasts yet</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

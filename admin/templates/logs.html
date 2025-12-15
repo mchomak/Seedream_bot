@@ -4,6 +4,21 @@
 {% block heading %}Admin Action Logs{% endblock %}
 
 {% block content %}
+<!-- Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <input type="text" class="form-control" name="action_filter" placeholder="Filter by action (e.g., user_balance, tariff)" value="{{ action_filter }}">
+            </div>
+            <div class="col-md-6">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-filter"></i> Filter</button>
+                <a href="/admin/logs" class="btn btn-secondary">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -61,17 +76,21 @@
     <div class="card-footer bg-white">
         <nav>
             <ul class="pagination justify-content-center mb-0">
-                <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                    <a class="page-link" href="?page={{ page - 1 }}">Previous</a>
+                {% if page > 1 %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page - 1 }}&action_filter={{ action_filter }}">Previous</a>
                 </li>
-                {% for p in range(1, min(total_pages + 1, 11)) %}
-                    <li class="page-item {% if p == page %}active{% endif %}">
-                        <a class="page-link" href="?page={{ p }}">{{ p }}</a>
-                    </li>
-                {% endfor %}
-                <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                    <a class="page-link" href="?page={{ page + 1 }}">Next</a>
+                {% endif %}
+
+                <li class="page-item disabled">
+                    <span class="page-link">Page {{ page }} of {{ total_pages }}</span>
                 </li>
+
+                {% if page < total_pages %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page + 1 }}&action_filter={{ action_filter }}">Next</a>
+                </li>
+                {% endif %}
             </ul>
         </nav>
     </div>
