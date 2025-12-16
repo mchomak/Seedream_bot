@@ -18,11 +18,19 @@ from setup_log import (
     report_exception,
 )
 from seedream_service import SeedreamService
+# app.py (или main.py)
+from localization import Localizer, LocalizerConfig
 
 
 async def main() -> None:
     # 1) Load settings from ENV/.env
     settings: Settings = load_env()
+
+    i18n = Localizer(LocalizerConfig(
+        path="locales/phrases.csv",  # или .json
+        default_lang="ru",
+        strict_keys=False,
+    )).load()
 
     # 2) Database (SQLite via async SQLAlchemy). Creates file/tables if missing.
     db = await Database.create(settings.database_url)
@@ -64,7 +72,7 @@ async def main() -> None:
     await install_bot_commands(bot, lang="ru")  # or "en"
 
     # 8) Routers: core handlers + tests + diagnostics
-    dp.include_router(build_router(db, seedream))
+    dp.include_router(build_router(db, seedream, i18n))
     dp.include_router(build_fsm_diag_router(settings.redis_url or ""))
 
     try:

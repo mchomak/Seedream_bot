@@ -398,6 +398,13 @@ phrases = {
         "btn_mode_all_items": "Задать единые настройки для всех вещей (быстрее)",
         "btn_mode_per_item": "Задать настройки для каждой вещи отдельно",
 
+        # Frozen account
+        "account_frozen": (
+            "🚫 <b>Ваш аккаунт заморожен</b>\n\n"
+            "Доступ к боту временно ограничен.\n"
+            "Для разблокировки обратитесь в техническую поддержку."
+        ),
+
     },
 
     "en": {
@@ -787,6 +794,13 @@ phrases = {
         "btn_gender_male": "Male",
         "gender_selected_stub": (
             "Model gender has been saved. The next steps will be hair color, age, style and aspect ratio."
+        ),
+
+        # Frozen account
+        "account_frozen": (
+            "🚫 <b>Your account is frozen</b>\n\n"
+            "Access to the bot is temporarily restricted.\n"
+            "Please contact support to unblock your account."
         ),
 
     },

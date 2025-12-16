@@ -157,6 +157,63 @@ class PaymentGuard(BaseMiddleware):
         return await handler(event, data)
 
 
+class FrozenUserGuard(BaseMiddleware):
+    """
+    Blocks all interactions from frozen users.
+    If user.is_frozen is True, sends a frozen message and stops processing.
+    """
+
+    def __init__(self, db):
+        """
+        Args:
+            db: Database instance for checking user frozen status
+        """
+        self.db = db
+        super().__init__()
+
+    async def __call__(self, handler, event, data: dict):
+        from aiogram.types import Message, CallbackQuery
+        from sqlalchemy import select
+        from db import User
+        from text import phrases
+
+        user_id = None
+        lang = "ru"  # Default language
+
+        # Get user_id from message or callback
+        if isinstance(event, Message) and event.from_user:
+            user_id = event.from_user.id
+            lang = event.from_user.language_code or "ru"
+            
+        elif isinstance(event, CallbackQuery) and event.from_user:
+            user_id = event.from_user.id
+            lang = event.from_user.language_code or "ru"
+
+        if user_id:
+            async with self.db.session() as session:
+                result = await session.execute(
+                    select(User).where(User.user_id == user_id)
+                )
+                user = result.scalar_one_or_none()
+
+                if user and user.is_frozen:
+                    # Normalize language
+                    if lang not in phrases:
+                        lang = "ru"
+
+                    frozen_msg = phrases[lang].get("account_frozen", phrases["ru"]["account_frozen"])
+
+                    if isinstance(event, Message):
+                        await event.answer(frozen_msg)
+                    elif isinstance(event, CallbackQuery):
+                        await event.answer(frozen_msg, show_alert=True)
+
+                    # Don't call handler - stop processing
+                    return
+
+        return await handler(event, data)
+
+
 # ---------- expectations for inputs ----------
 
 async def expect_any(state: FSMContext) -> None:
