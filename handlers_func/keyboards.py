@@ -2,33 +2,29 @@
 """Keyboard builders for the Telegram bot."""
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
-from text import phrases
+from handlers_func.i18n_helpers import i18n, T 
 
 
 def _lang_display_name(code: str) -> str:
-    """Return autonym for language code."""
-    mapping = {
-        "ru": "Русский",
-        "en": "English",
-    }
-    return mapping.get(code, code.upper())
-
-
-def T(locale: str, key: str, **fmt) -> str:
-    """Get string from `phrases` with fallback to English."""
-    val = phrases.get(locale, {}).get(key) or phrases["en"].get(key) or key
-    return val.format(**fmt)
+    """
+    Autonym для кода языка.
+    Приоритет:
+      1) i18n key: lang_name.<code>  (например lang_name.ru = Русский)
+      2) fallback: code.upper()
+    """
+    name = i18n.t(f"lang_name.{code}", lang=code)
+    return code.upper() if (not name or name == f"lang_name.{code}") else name
 
 
 def build_lang_kb() -> InlineKeyboardMarkup:
     """Build language selection keyboard."""
-    codes = list(phrases.keys())
+    codes = i18n.available_languages()
+
     buttons = [
         InlineKeyboardButton(text=_lang_display_name(code), callback_data=f"set_lang:{code}")
         for code in codes
     ]
-    # chunk by 2 per row
+
     rows = [buttons[i : i + 2] for i in range(0, len(buttons), 2)]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
