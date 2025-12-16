@@ -1111,16 +1111,21 @@ async def analytics_page(
         else:
             start_date = now - timedelta(days=30)
 
-        # Generation type popularity
-        gen_types_query = await session.execute(
-            select(
-                Generation.params['scenario'].astext.label('scenario'),
-                func.count(Generation.id).label('count')
-            ).where(
-                Generation.created_at >= start_date,
-            ).group_by(Generation.params['scenario'].astext)
+        # Generation type popularity - use raw SQL to avoid GROUP BY issues
+        from sqlalchemy import text
+        gen_types_raw = await session.execute(
+            text("""
+                SELECT
+                    COALESCE(params->>'scenario', 'unknown') as scenario,
+                    COUNT(*) as count
+                FROM generations
+                WHERE created_at >= :start_date
+                GROUP BY params->>'scenario'
+                ORDER BY count DESC
+            """),
+            {"start_date": start_date}
         )
-        gen_types = gen_types_query.all()
+        gen_types = gen_types_raw.all()
 
         # Daily metrics for charts
         daily_metrics_query = await session.execute(
@@ -1150,17 +1155,20 @@ async def analytics_page(
         )
         daily_gens = daily_gens_query.all()
 
-        # User cohorts (simplified)
-        cohorts_query = await session.execute(
-            select(
-                func.date_trunc('week', User.created_at).label('cohort'),
-                func.count(User.id).label('count')
-            ).where(
-                User.created_at >= start_date,
-            ).group_by(func.date_trunc('week', User.created_at))
-            .order_by(func.date_trunc('week', User.created_at))
+        # User cohorts - use raw SQL to avoid GROUP BY issues with date_trunc
+        cohorts_raw = await session.execute(
+            text("""
+                SELECT
+                    DATE_TRUNC('week', created_at) as cohort,
+                    COUNT(*) as count
+                FROM users
+                WHERE created_at >= :start_date
+                GROUP BY DATE_TRUNC('week', created_at)
+                ORDER BY DATE_TRUNC('week', created_at)
+            """),
+            {"start_date": start_date}
         )
-        cohorts = cohorts_query.all()
+        cohorts = cohorts_raw.all()
 
         # Aggregate user balance
         total_credits = await session.scalar(
@@ -1173,7 +1181,7 @@ async def analytics_page(
             "tx_count": [m.count for m in daily_metrics],
             "gen_dates": [str(g.date) for g in daily_gens],
             "gen_total": [g.total for g in daily_gens],
-            "gen_success": [g.success for g in daily_gens],
+            "gen_success": [int(g.success or 0) for g in daily_gens],
             "gen_types": {str(g.scenario or 'unknown'): g.count for g in gen_types},
             "cohort_dates": [str(c.cohort.date()) if c.cohort else '' for c in cohorts],
             "cohort_counts": [c.count for c in cohorts],
