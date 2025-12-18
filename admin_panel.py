@@ -42,6 +42,7 @@ from db import (
     Backup,
 )
 from config import load_env, GEN_SCENARIO_PRICES
+# http://localhost:8001/admin/login
 
 # Initialize FastAPI app
 app = FastAPI(title="Seedream Admin Panel", version="2.0.0")
