@@ -14,6 +14,8 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InlineKeyboardButton,
     CallbackQuery,
+    BotCommand,
+    BotCommandScopeChat,
 )
 from loguru import logger
 from sqlalchemy import select
@@ -53,7 +55,6 @@ from handlers_func.keyboards import (
     _lang_display_name,
     build_main_keyboard,
 )
-import localization
 
 
 # ---------- payments (Stars) ----------
@@ -128,7 +129,7 @@ class StarsPay:
                 s,
                 user_id=user_id,
                 tg_username=mes.from_user.username if mes.from_user else None,
-                lang=(mes.from_user.language_code if mes.from_user else None),
+                # Don't overwrite lang - only /language command should change it
                 last_seen_at=datetime.now(timezone.utc),
                 is_premium=getattr(mes.from_user, "is_premium", False)
                 if mes.from_user
@@ -219,7 +220,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                 s,
                 user_id=m.from_user.id,
                 tg_username=m.from_user.username,
-                lang=m.from_user.language_code,
+                # Don't overwrite lang - only /language command should change it
                 last_seen_at=datetime.now(timezone.utc),
                 is_premium=getattr(m.from_user, "is_premium", False),
                 is_bot=m.from_user.is_bot,
@@ -227,12 +228,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         lang = await get_lang(m, db)
         await state.clear()  # Clear any existing state
         await m.answer(
-            f"<b>{T(lang, 'start_title')}</b>\n{T(lang, 'start_desc')}",
-            reply_markup=build_main_keyboard(lang)
-        )
-        await state.clear()  # Clear any existing state
-        await m.answer(
-            f"<b>{T(lang, 'start_title')}</b>\n{T(lang, 'start_desc')}",
+            f"{T(lang, 'start_title')}",
             reply_markup=build_main_keyboard(lang)
         )
 
@@ -1010,9 +1006,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             return
 
         new_lang = parts[1]
-        if new_lang not in localization.keys():
+        if new_lang not in i18n.available_languages():
             lang = await get_lang(q, db)
-            await q.answer(localization.T(lang, "unknown_lang"), show_alert=True)
+            await q.answer(i18n.t("unknown_lang", lang=lang), show_alert=True)
             return
 
         # Persist language
@@ -1027,22 +1023,37 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                 is_bot=q.from_user.is_bot,
             )
 
-        # Acknowledge + edit original message with confirmation in the selected language
+        # Acknowledge
         await q.answer("OK")
+
+        # Edit original message with confirmation
         try:
             await q.message.edit_text(
-                localization.T(new_lang, "lang_switched", lang=_lang_display_name(new_lang))
+                i18n.t("lang_switched", lang=new_lang, language=_lang_display_name(new_lang))
             )
         except Exception:
-            # if message can't be edited (e.g., no rights), just send a new one
-            await bot.send_message(
-                chat_id=q.message.chat.id,
-                text=localization.T(
-                    new_lang,
-                    "lang_switched",
-                    lang=_lang_display_name(new_lang),
-                ),
-            )
+            pass
+
+        # Update persistent keyboard with translated buttons
+        await bot.send_message(
+            chat_id=q.message.chat.id,
+            text=i18n.t("start_title", lang=new_lang),
+            reply_markup=build_main_keyboard(new_lang),
+        )
+
+        # Update bot commands for this user's chat
+        items = i18n.group("help_items", lang=new_lang)
+        cmds = [
+            BotCommand(command="start", description=items.get("start", "Start")),
+            BotCommand(command="help", description=items.get("help", "Help")),
+            BotCommand(command="profile", description=items.get("profile", "Profile")),
+            BotCommand(command="generate", description=items.get("generate", "Generate")),
+            BotCommand(command="examples", description=items.get("examples", "Examples")),
+            BotCommand(command="buy", description=items.get("buy", "Buy")),
+            BotCommand(command="language", description=items.get("language", "Language")),
+            BotCommand(command="cancel", description=items.get("cancel", "Cancel")),
+        ]
+        await bot.set_my_commands(cmds, scope=BotCommandScopeChat(chat_id=q.message.chat.id))
 
 
     @r.message(Command("examples"))
@@ -1074,7 +1085,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                 s,
                 user_id=m.from_user.id,
                 tg_username=m.from_user.username,
-                lang=m.from_user.language_code,
+                # Don't overwrite lang - only /language command should change it
                 last_seen_at=datetime.now(timezone.utc),
                 is_premium=getattr(m.from_user, "is_premium", False),
                 is_bot=m.from_user.is_bot,

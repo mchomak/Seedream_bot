@@ -57,21 +57,24 @@ async def get_lang(event: Message | CallbackQuery, db: Optional[Database] = None
     3) default_lang
     """
     # 1) DB
-    try:
-        if db and getattr(event, "from_user", None) is not None:
-            uid = event.from_user.id
+    if db and getattr(event, "from_user", None) is not None:
+        uid = event.from_user.id
+        try:
             async with db.session() as s:
                 row = await s.execute(select(User.lang).where(User.user_id == uid))
                 lang = row.scalar_one_or_none()
                 if lang:
-                    return _supported_lang(lang)
-    except Exception:
-        # не ломаем поток при ошибке БД
-        pass
+                    result = _supported_lang(lang)
+                    logger.debug(f"get_lang: DB lang={lang} -> {result} for user {uid}")
+                    return result
+        except Exception as e:
+            logger.warning(f"get_lang: DB error for user {uid}: {e}")
 
     # 2) Telegram UI language
     tg_code = (getattr(event, "from_user", None) and event.from_user.language_code) or DEFAULT_LANG
-    return _supported_lang(tg_code)
+    result = _supported_lang(tg_code)
+    logger.debug(f"get_lang: fallback to tg_code={tg_code} -> {result}")
+    return result
 
 
 def T(locale: str, key: str, **fmt) -> str:

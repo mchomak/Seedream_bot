@@ -175,19 +175,15 @@ class FrozenUserGuard(BaseMiddleware):
         from aiogram.types import Message, CallbackQuery
         from sqlalchemy import select
         from db import User
-        from text import phrases
+        from handlers_func.i18n_helpers import i18n
 
         user_id = None
-        lang = "ru"  # Default language
 
         # Get user_id from message or callback
         if isinstance(event, Message) and event.from_user:
             user_id = event.from_user.id
-            lang = event.from_user.language_code or "ru"
-            
         elif isinstance(event, CallbackQuery) and event.from_user:
             user_id = event.from_user.id
-            lang = event.from_user.language_code or "ru"
 
         if user_id:
             async with self.db.session() as session:
@@ -197,11 +193,9 @@ class FrozenUserGuard(BaseMiddleware):
                 user = result.scalar_one_or_none()
 
                 if user and user.is_frozen:
-                    # Normalize language
-                    if lang not in phrases:
-                        lang = "ru"
-
-                    frozen_msg = phrases[lang].get("account_frozen", phrases["ru"]["account_frozen"])
+                    # Get language from DB, fallback to ru
+                    lang = user.lang if user.lang in i18n.available_languages() else "ru"
+                    frozen_msg = i18n.t("account_frozen", lang=lang)
 
                     if isinstance(event, Message):
                         await event.answer(frozen_msg)

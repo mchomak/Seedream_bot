@@ -165,7 +165,7 @@ invoice_title,Balance top-up (Stars),Пополнение баланса (звё
 kb_examples,📸 Examples,📸 Примеры
 kb_generation,🎨 Generation,🎨 Генерация
 kb_my_account,👤 My Account,👤 Мой аккаунт
-lang_switched,Interface language switched to: {lang},Язык интерфейса переключен на: {lang}
+lang_switched,Interface language switched to: {language},Язык интерфейса переключен на: {language}
 moving_to_angles,Moving to new angles and poses selection...,Переход к выбору новых ракурсов и поз...
 moving_to_next_base,Moving to next base photo...,Переход к следующему базовому фото...
 multi_items_intro,"You have uploaded {count} items.
@@ -268,16 +268,7 @@ settings_style_title,"Select one or more output photo styles.
 The style affects how the model and clothing will look. Multiple styles increase the number of generated images.","Выберите один или несколько стилей фото на выходе.
 
 Стиль влияет на то, как нейросеть обработает одежду и модель. Несколько стилей увеличивают количество создаваемых фото."
-start_desc,"I help you turn photos of your clothing items into realistic model shots.
-
-Upload a photo of an item, choose background, style and model parameters — I will build a prompt and send it to the Seedream 4.0 model.
-
-Generation flow is still under development, but you can already manage your profile and top up balance with Telegram Stars.","Я помогу превратить фото вашей одежды в реалистичные кадры на моделях.
-
-Загрузите фото вещи, выберите фон, стиль, параметры модели — а я подготовлю промпт и отправлю запрос в нейросеть Seedream 4.0.
-
-Пока генерация в разработке, но вы уже можете настраивать профиль и пополнять баланс звёздами."
-start_title,Hi! This is the Seedream virtual try-on bot.,Привет! Это бот виртуальной примерочной Seedream.
+start_title,Welcome to AI models Bot! Here you can instantly turn a photo of clothes into a ready - to - sell catalog of professional photographs of beautiful models of any gender and age in 4K resolution.,Добро пожаловать в AI models Bot! Здесь вы можете моментально превратить фото одежды в готовый ĸ продаже ĸаталог профессиональных снимĸов на ĸрасивых моделях любых полов и возрастов в разрешении 4K.
 style_need_one,Please select at least one style to continue.,"Выберите хотя бы один стиль, чтобы продолжить."
 style_selected_header,Selected styles:,Выбранные стили:
 task_queued,"Your request has been queued (ID: {task_id}).
