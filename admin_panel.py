@@ -14,12 +14,15 @@ from typing import Optional, List, Dict, Any
 import csv
 import io
 
+import shutil
 from fastapi import FastAPI, Request, Depends, HTTPException, status, Form, Query, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 import bcrypt
+from aiogram import Bot
+from aiogram.client.default import DefaultBotProperties
 
 from sqlalchemy import select, func, and_, or_, desc, case, extract
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -68,8 +71,8 @@ else:
 # Database
 db: Optional[Database] = None
 
-# Bot instance for sending messages (will be set externally)
-bot_instance = None
+# Bot instance for sending messages (created on startup using TELEGRAM_BOT_TOKEN)
+bot_instance: Optional[Bot] = None
 
 
 def set_bot_instance(bot):
@@ -80,22 +83,34 @@ def set_bot_instance(bot):
 
 @app.on_event("startup")
 async def startup():
-    """Initialize database on startup."""
-    global db
+    """Initialize database and bot on startup."""
+    global db, bot_instance
     db = await Database.create(settings.database_url)
     # Initialize default settings if not exists
     await init_default_settings()
 
+    # Create bot instance for sending messages from admin panel
+    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    if telegram_token:
+        bot_instance = Bot(
+            token=telegram_token,
+            default=DefaultBotProperties(parse_mode="HTML"),
+        )
+
 
 @app.on_event("shutdown")
 async def shutdown():
-    """Close database on shutdown."""
+    """Close database and bot on shutdown."""
+    global bot_instance
+    if bot_instance:
+        await bot_instance.session.close()
+        bot_instance = None
     if db:
         await db.close()
 
 
 async def init_default_settings():
-    """Initialize default system settings."""
+    """Initialize default system settings, scenario prices, and tariff packages."""
     async with db.session() as session:
         # Check if settings exist
         result = await session.execute(select(SystemSetting).where(SystemSetting.key == "free_generations"))
@@ -113,6 +128,58 @@ async def init_default_settings():
         if not result.scalar_one_or_none():
             for key, cost in GEN_SCENARIO_PRICES.items():
                 session.add(ScenarioPrice(scenario_key=key, credits_cost=cost))
+
+        # Initialize default tariff packages if table is empty
+        result = await session.execute(select(TariffPackage).limit(1))
+        if not result.scalar_one_or_none():
+            default_packages = [
+                TariffPackage(
+                    name="Starter",
+                    credits=10,
+                    price=Decimal("99.00"),
+                    currency="RUB",
+                    sort_order=1,
+                    is_active=True,
+                ),
+                TariffPackage(
+                    name="Basic",
+                    credits=30,
+                    price=Decimal("249.00"),
+                    currency="RUB",
+                    discount_percent=17,
+                    sort_order=2,
+                    is_active=True,
+                ),
+                TariffPackage(
+                    name="Standard",
+                    credits=70,
+                    price=Decimal("499.00"),
+                    currency="RUB",
+                    discount_percent=28,
+                    sort_order=3,
+                    is_active=True,
+                ),
+                TariffPackage(
+                    name="Pro",
+                    credits=150,
+                    price=Decimal("899.00"),
+                    currency="RUB",
+                    discount_percent=40,
+                    sort_order=4,
+                    is_active=True,
+                ),
+                TariffPackage(
+                    name="Business",
+                    credits=350,
+                    price=Decimal("1799.00"),
+                    currency="RUB",
+                    discount_percent=48,
+                    sort_order=5,
+                    is_active=True,
+                ),
+            ]
+            for pkg in default_packages:
+                session.add(pkg)
 
 
 # ============= Authentication =============
@@ -1431,6 +1498,16 @@ async def create_backup(
             # For PostgreSQL, use pg_dump
             db_url = settings.database_url
             if "postgresql" in db_url:
+                # Check if pg_dump is available
+                pg_dump_path = shutil.which("pg_dump")
+                if not pg_dump_path:
+                    raise Exception(
+                        "pg_dump command not found. Please install PostgreSQL client tools. "
+                        "On Ubuntu/Debian: apt-get install postgresql-client. "
+                        "On macOS: brew install postgresql. "
+                        "On Windows: install PostgreSQL and add bin folder to PATH."
+                    )
+
                 # Parse connection string
                 import urllib.parse
                 parsed = urllib.parse.urlparse(db_url.replace("postgresql+asyncpg://", "postgresql://"))
@@ -1439,7 +1516,7 @@ async def create_backup(
                 env["PGPASSWORD"] = parsed.password or ""
 
                 cmd = [
-                    "pg_dump",
+                    pg_dump_path,
                     "-h", parsed.hostname or "localhost",
                     "-p", str(parsed.port or 5432),
                     "-U", parsed.username or "postgres",
@@ -1447,15 +1524,18 @@ async def create_backup(
                     "-f", filepath,
                 ]
 
-                result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
                 if result.returncode != 0:
-                    raise Exception(result.stderr)
+                    raise Exception(result.stderr or f"pg_dump failed with exit code {result.returncode}")
 
                 backup_record.file_size = os.path.getsize(filepath)
             else:
                 backup_record.status = "failed"
                 backup_record.error_message = "Only PostgreSQL backups are supported"
 
+        except subprocess.TimeoutExpired:
+            backup_record.status = "failed"
+            backup_record.error_message = "Backup timed out after 5 minutes"
         except Exception as e:
             backup_record.status = "failed"
             backup_record.error_message = str(e)[:500]

@@ -13,7 +13,7 @@ from .keyboards import (
     build_main_keyboard
 )
 from .i18n_helpers import get_lang, T, T_item, install_bot_commands
-from .db_helpers import Profile, get_profile, ensure_credits_and_create_generation
+from .db_helpers import Profile, get_profile, ensure_credits_and_create_generation, get_scenario_price
 
 __all__ = [
     # Keyboards
@@ -31,4 +31,5 @@ __all__ = [
     "Profile",
     "get_profile",
     "ensure_credits_and_create_generation",
+    "get_scenario_price",
 ]
