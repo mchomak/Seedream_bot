@@ -7,7 +7,7 @@ from typing import Optional, Any
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import User, Transaction, TransactionStatus, Generation, GenerationStatus, create_generation
+from db import User, Transaction, TransactionStatus, Generation, GenerationStatus, ScenarioPrice, create_generation
 from config import GEN_SCENARIO_PRICES
 
 
@@ -60,6 +60,24 @@ async def get_profile(session: AsyncSession, *, tg_user_id: int) -> Profile:
     )
 
 
+async def get_scenario_price(session: AsyncSession, scenario_key: str) -> int:
+    """
+    Get the credit cost for a scenario from the database.
+    Falls back to config.py if not found in database.
+    """
+    result = await session.execute(
+        select(ScenarioPrice).where(
+            ScenarioPrice.scenario_key == scenario_key,
+            ScenarioPrice.is_active == True
+        )
+    )
+    scenario = result.scalar_one_or_none()
+    if scenario:
+        return scenario.credits_cost
+    # Fallback to config.py
+    return GEN_SCENARIO_PRICES.get(scenario_key, 1)
+
+
 async def ensure_credits_and_create_generation(
     session: AsyncSession,
     *,
@@ -76,8 +94,8 @@ async def ensure_credits_and_create_generation(
     Возвращает (generation | None, user | None, price_credits).
     Если кредитов не хватило — generation=None, user=None.
     """
-    # узнаём цену сценария
-    price = GEN_SCENARIO_PRICES.get(scenario_key, 1)
+    # Get price from database (falls back to config if not in DB)
+    price = await get_scenario_price(session, scenario_key)
 
     user = (
         await session.execute(select(User).where(User.user_id == tg_user_id))

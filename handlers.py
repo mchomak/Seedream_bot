@@ -45,7 +45,7 @@ import json
 from io import BytesIO
 # Import helper functions from modular structure
 from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands
-from handlers_func.db_helpers import Profile, get_profile, ensure_credits_and_create_generation
+from handlers_func.db_helpers import Profile, get_profile, ensure_credits_and_create_generation, get_scenario_price
 from handlers_func.keyboards import (
     build_lang_kb as _build_lang_kb,
     build_background_keyboard,
@@ -1091,8 +1091,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                 is_bot=m.from_user.is_bot,
             )
             balance = int(user.credits_balance or 0)
+            initial_price = await get_scenario_price(s, "initial_generation")
 
-        if balance < GEN_SCENARIO_PRICES["initial_generation"]:
+        if balance < initial_price:
             await m.answer(T(lang, "no_credits"))
             return
 
@@ -2711,10 +2712,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                 total_combinations += max(len(bgs), 1) * (1 if hair_combo == [None] else len(hair_combo)) * max(len(styles), 1) * max(len(aspects), 1)
 
             # Check if user has enough credits for ALL combinations (1 credit per combination)
-            price_per_generation = GEN_SCENARIO_PRICES.get("initial_generation", 1)
-            total_cost = total_combinations * price_per_generation
-
             async with db.session() as s:
+                price_per_generation = await get_scenario_price(s, "initial_generation")
+                total_cost = total_combinations * price_per_generation
+
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
                 ).scalar_one_or_none()
@@ -2872,10 +2873,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             total_combinations = len(cloth_urls) * bg_count * hair_count * style_count * aspect_count
 
             # Check if user has enough credits for ALL combinations (1 credit per combination)
-            price_per_generation = GEN_SCENARIO_PRICES.get("initial_generation", 1)
-            total_cost = total_combinations * price_per_generation
-
             async with db.session() as s:
+                price_per_generation = await get_scenario_price(s, "initial_generation")
+                total_cost = total_combinations * price_per_generation
+
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
                 ).scalar_one_or_none()
