@@ -140,7 +140,12 @@ def load_env(env_file: str = ".env") -> Settings:
 
     token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
 
-    database_url = os.getenv("DATABASE_URL").strip()
+    database_url = (os.getenv("DATABASE_URL") or "").strip()
+    if database_url.startswith("postgres://"):
+        database_url = "postgresql+asyncpg://" + database_url[len("postgres://"):]
+    elif database_url.startswith("postgresql://"):
+        database_url = "postgresql+asyncpg://" + database_url[len("postgresql://"):]
+
     redis_url = os.getenv("REDIS_URL")
     seedream_api = os.getenv("SEEDREAM_API")
 
