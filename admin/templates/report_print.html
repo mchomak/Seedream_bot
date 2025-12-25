@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seedream Bot Report - {{ report.period_label }}</title>
+    <style>
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #333;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #007bff;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            padding: 8px 12px;
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            margin-bottom: 15px;
+        }
+
+        .section-title.success { border-left-color: #28a745; }
+        .section-title.info { border-left-color: #17a2b8; }
+        .section-title.warning { border-left-color: #ffc107; }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .metric-card.success .value { color: #28a745; }
+        .metric-card.warning .value { color: #ffc107; }
+        .metric-card.info .value { color: #17a2b8; }
+
+        .metric-card .label {
+            font-size: 11px;
+            color: #6c757d;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+
+        th, td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .text-right { text-align: right; }
+        .text-success { color: #28a745; }
+        .text-danger { color: #dc3545; }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            text-align: center;
+            color: #6c757d;
+            font-size: 11px;
+        }
+
+        .print-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .print-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">
+        Print / Save as PDF
+    </button>
+
+    <div class="header">
+        <h1>Seedream Bot Analytics Report</h1>
+        <div class="subtitle">{{ report.period_label }} | Generated: {{ report.generated_at }}</div>
+    </div>
+
+    <!-- Unit Economics -->
+    <div class="section">
+        <div class="section-title">Unit Economics</div>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="value">{{ report.avg_check }}</div>
+                <div class="label">Average Check (RUB)</div>
+            </div>
+            <div class="metric-card success">
+                <div class="value">{{ report.arpu }}</div>
+                <div class="label">ARPU</div>
+            </div>
+            <div class="metric-card warning">
+                <div class="value">{{ report.arppu }}</div>
+                <div class="label">ARPPU</div>
+            </div>
+            <div class="metric-card info">
+                <div class="value">{{ report.ltv }}</div>
+                <div class="label">LTV</div>
+            </div>
+            <div class="metric-card">
+                <div class="value">{{ report.conversion }}%</div>
+                <div class="label">Conversion to Payment</div>
+            </div>
+            <div class="metric-card success">
+                <div class="value">{{ report.success_rate }}%</div>
+                <div class="label">Generation Success Rate</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Metrics -->
+    <div class="section">
+        <div class="section-title">User Metrics</div>
+        <table>
+            <tr>
+                <td>Total Users</td>
+                <td class="text-right"><strong>{{ report.total_users }}</strong></td>
+            </tr>
+            <tr>
+                <td>New Users (Period)</td>
+                <td class="text-right"><strong class="text-success">+{{ report.new_users }}</strong></td>
+            </tr>
+            <tr>
+                <td>Active Users (Period)</td>
+                <td class="text-right"><strong>{{ report.active_users }}</strong></td>
+            </tr>
+            <tr>
+                <td>Paying Users</td>
+                <td class="text-right"><strong>{{ report.paying_users }}</strong></td>
+            </tr>
+            <tr>
+                <td>Users with Balance</td>
+                <td class="text-right"><strong>{{ report.users_with_balance }}</strong></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Financial Metrics -->
+    <div class="section">
+        <div class="section-title success">Financial Metrics</div>
+        <table>
+            <tr>
+                <td>Total Revenue (All Time)</td>
+                <td class="text-right"><strong>{{ "%.2f"|format(report.total_revenue) }} RUB</strong></td>
+            </tr>
+            <tr>
+                <td>Revenue (Period)</td>
+                <td class="text-right"><strong class="text-success">{{ "%.2f"|format(report.revenue_period) }} RUB</strong></td>
+            </tr>
+            <tr>
+                <td>Average Check</td>
+                <td class="text-right"><strong>{{ report.avg_check }} RUB</strong></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Generation Metrics -->
+    <div class="section">
+        <div class="section-title info">Generation Metrics</div>
+        <table>
+            <tr>
+                <td>Total Generations (Period)</td>
+                <td class="text-right"><strong>{{ report.total_generations }}</strong></td>
+            </tr>
+            <tr>
+                <td>Successful Generations</td>
+                <td class="text-right"><strong class="text-success">{{ report.successful_gens }}</strong></td>
+            </tr>
+            <tr>
+                <td>Failed Generations</td>
+                <td class="text-right"><strong class="text-danger">{{ report.failed_gens }}</strong></td>
+            </tr>
+            <tr>
+                <td>Success Rate</td>
+                <td class="text-right"><strong>{{ report.success_rate }}%</strong></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Balance Metrics -->
+    <div class="section">
+        <div class="section-title warning">User Balance (Aggregated)</div>
+        <table>
+            <tr>
+                <td>Total Credits in System</td>
+                <td class="text-right"><strong>{{ report.total_credits }}</strong></td>
+            </tr>
+            <tr>
+                <td>Users with Balance > 0</td>
+                <td class="text-right"><strong>{{ report.users_with_balance }}</strong></td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- Generation Types -->
+    {% if report.gen_types %}
+    <div class="section">
+        <div class="section-title">Generation Types Popularity</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Scenario</th>
+                    <th class="text-right">Count</th>
+                    <th class="text-right">Share</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gt in report.gen_types %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ gt.scenario }}</td>
+                    <td class="text-right">{{ gt.count }}</td>
+                    <td class="text-right">
+                        {% set pct = (gt.count / report.total_generations * 100) if report.total_generations > 0 else 0 %}
+                        {{ "%.1f"|format(pct) }}%
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Seedream Bot Analytics Report</p>
+        <p>Generated automatically by Admin Panel</p>
+    </div>
+</body>
+</html>
