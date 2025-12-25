@@ -1723,13 +1723,13 @@ async def reports_page(
 
         chart_data = {
             "revenue_dates": [str(d.date) for d in daily_revenue],
-            "revenue_values": [float(d.revenue) for d in daily_revenue],
-            "tx_counts": [d.tx_count for d in daily_revenue],
+            "revenue_values": [float(d.revenue or 0) for d in daily_revenue],
+            "tx_counts": [int(d.tx_count or 0) for d in daily_revenue],
             "users_dates": [str(d.date) for d in daily_users],
-            "new_users": [d.new_users for d in daily_users],
-            "cumulative_users": [d.cumulative for d in daily_users],
+            "new_users": [int(d.new_users or 0) for d in daily_users],
+            "cumulative_users": [int(d.cumulative or 0) for d in daily_users],
             "gen_types_labels": [g.scenario for g in gen_types],
-            "gen_types_values": [g.count for g in gen_types],
+            "gen_types_values": [int(g.count or 0) for g in gen_types],
         }
 
         return templates.TemplateResponse(
