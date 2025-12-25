@@ -100,6 +100,9 @@ class User(Base):
     money_balance: Mapped[Decimal] = mapped_column(
         Numeric(18, 2), nullable=False, default=Decimal("0.00")
     )  # условный рублёвый баланс (если нужен)
+    free_generations_used: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )  # количество использованных бесплатных генераций
 
     # Метаданные
     created_at: Mapped[datetime] = mapped_column(

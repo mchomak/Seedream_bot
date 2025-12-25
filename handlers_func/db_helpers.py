@@ -3,12 +3,79 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional, Any
-from sqlalchemy import select, func
+from typing import Optional, Any, List
+from sqlalchemy import select, func, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import User, Transaction, TransactionStatus, Generation, GenerationStatus, ScenarioPrice, create_generation
+from db import User, Transaction, TransactionStatus, Generation, GenerationStatus, ScenarioPrice, SystemSetting, TariffPackage, create_generation
 from config import GEN_SCENARIO_PRICES
+
+
+# ========== System Settings Helpers ==========
+
+async def get_system_setting(session: AsyncSession, key: str, default: str = "") -> str:
+    """Get a system setting value from the database."""
+    result = await session.execute(
+        select(SystemSetting).where(SystemSetting.key == key)
+    )
+    setting = result.scalar_one_or_none()
+    return setting.value if setting else default
+
+
+async def get_free_generations_limit(session: AsyncSession) -> int:
+    """Get the number of free generations allowed for new users."""
+    value = await get_system_setting(session, "free_generations", "3")
+    try:
+        return int(value)
+    except ValueError:
+        return 3
+
+
+async def get_single_credit_price_rub(session: AsyncSession) -> Decimal:
+    """Get the price of 1 credit in rubles."""
+    value = await get_system_setting(session, "single_credit_price_rub", "10")
+    try:
+        return Decimal(value)
+    except:
+        return Decimal("10")
+
+
+async def get_stars_to_rub_rate(session: AsyncSession) -> Decimal:
+    """Get the exchange rate: 1 Telegram Star = X rubles."""
+    value = await get_system_setting(session, "stars_to_rub_rate", "1.5")
+    try:
+        return Decimal(value)
+    except:
+        return Decimal("1.5")
+
+
+def calculate_stars_for_rubles(rubles: Decimal, stars_to_rub_rate: Decimal) -> int:
+    """Calculate the number of Stars needed for a given amount in rubles."""
+    if stars_to_rub_rate <= 0:
+        stars_to_rub_rate = Decimal("1.5")
+    stars = rubles / stars_to_rub_rate
+    # Round up to ensure we don't charge less than the price
+    return int(stars.to_integral_value(rounding='ROUND_CEILING'))
+
+
+# ========== Tariff Helpers ==========
+
+async def get_active_tariffs(session: AsyncSession) -> List[TariffPackage]:
+    """Get all active tariff packages sorted by sort_order."""
+    result = await session.execute(
+        select(TariffPackage)
+        .where(TariffPackage.is_active == True)
+        .order_by(asc(TariffPackage.sort_order))
+    )
+    return list(result.scalars().all())
+
+
+async def get_tariff_by_id(session: AsyncSession, tariff_id: int) -> Optional[TariffPackage]:
+    """Get a tariff package by ID."""
+    result = await session.execute(
+        select(TariffPackage).where(TariffPackage.id == tariff_id)
+    )
+    return result.scalar_one_or_none()
 
 
 @dataclass
@@ -78,6 +145,41 @@ async def get_scenario_price(session: AsyncSession, scenario_key: str) -> int:
     return GEN_SCENARIO_PRICES.get(scenario_key, 1)
 
 
+async def check_can_generate(
+    session: AsyncSession,
+    *,
+    tg_user_id: int,
+    scenario_key: str = "initial_generation",
+) -> tuple[bool, Optional[User], int, bool]:
+    """
+    Check if user can generate (has credits or free generations available).
+
+    Returns (can_generate, user, price, using_free_generation).
+    """
+    price = await get_scenario_price(session, scenario_key)
+    free_limit = await get_free_generations_limit(session)
+
+    user = (
+        await session.execute(select(User).where(User.user_id == tg_user_id))
+    ).scalar_one_or_none()
+
+    if user is None:
+        return False, None, price, False
+
+    free_used = int(user.free_generations_used or 0)
+    current_balance = int(user.credits_balance or 0)
+
+    # Check if user has free generations left
+    if free_used < free_limit:
+        return True, user, price, True
+
+    # Check if user has enough credits
+    if current_balance >= price:
+        return True, user, price, False
+
+    return False, user, price, False
+
+
 async def ensure_credits_and_create_generation(
     session: AsyncSession,
     *,
@@ -89,13 +191,14 @@ async def ensure_credits_and_create_generation(
     source_image_urls: Optional[list[str]] = None,
 ) -> tuple[Optional[Generation], Optional[User], int]:
     """
-    Проверить баланс, списать кредиты и создать Generation.
+    Проверить баланс (или бесплатные генерации), списать кредиты и создать Generation.
 
     Возвращает (generation | None, user | None, price_credits).
-    Если кредитов не хватило — generation=None, user=None.
+    Если кредитов/бесплатных генераций не хватило — generation=None.
     """
     # Get price from database (falls back to config if not in DB)
     price = await get_scenario_price(session, scenario_key)
+    free_limit = await get_free_generations_limit(session)
 
     user = (
         await session.execute(select(User).where(User.user_id == tg_user_id))
@@ -104,12 +207,24 @@ async def ensure_credits_and_create_generation(
     if user is None:
         return None, None, price
 
+    free_used = int(user.free_generations_used or 0)
     current_balance = int(user.credits_balance or 0)
-    if current_balance < price:
-        return None, user, price
 
-    # списываем кредиты
-    user.credits_balance = current_balance - price
+    using_free = False
+    actual_credits_spent = price
+
+    # Check if user has free generations left
+    if free_used < free_limit:
+        # Use free generation
+        user.free_generations_used = free_used + 1
+        using_free = True
+        actual_credits_spent = 0
+    elif current_balance >= price:
+        # Deduct from credits balance
+        user.credits_balance = current_balance - price
+    else:
+        # Not enough credits
+        return None, user, price
 
     # создаём запись Generation
     generation = await create_generation(
@@ -120,7 +235,7 @@ async def ensure_credits_and_create_generation(
         params=params,
         source_image_urls=source_image_urls,
         total_images_planned=total_images_planned,
-        credits_spent=price,
+        credits_spent=actual_credits_spent,
         status=GenerationStatus.queued,
         external_id=None,
     )
