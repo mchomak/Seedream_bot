@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block title %}Conversions - Seedream Admin{% endblock %}
+{% block heading %}Conversion Funnels{% endblock %}
+
+{% block content %}
+<!-- Period Filter -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="btn-group">
+            <a href="/admin/conversions?period=7d" class="btn btn-{% if period == '7d' %}primary{% else %}outline-primary{% endif %}">7 Days</a>
+            <a href="/admin/conversions?period=30d" class="btn btn-{% if period == '30d' %}primary{% else %}outline-primary{% endif %}">30 Days</a>
+            <a href="/admin/conversions?period=90d" class="btn btn-{% if period == '90d' %}primary{% else %}outline-primary{% endif %}">90 Days</a>
+            <a href="/admin/conversions?period=all" class="btn btn-{% if period == 'all' %}primary{% else %}outline-primary{% endif %}">All Time</a>
+        </div>
+    </div>
+</div>
+
+<!-- Conversion Funnel Cards -->
+<div class="row mb-4">
+    <!-- 1. Launch → Payment -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="fas fa-rocket"></i> Launch → Payment</h6>
+            </div>
+            <div class="card-body">
+                <div class="funnel-visual mb-3">
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); padding: 15px; color: white; border-radius: 8px 8px 0 0;">
+                        <div class="d-flex justify-content-between">
+                            <span>Bot Launches</span>
+                            <strong>{{ funnel_data.launch_to_payment.total_launched }}</strong>
+                        </div>
+                    </div>
+                    <div class="funnel-arrow text-center" style="font-size: 1.5rem; color: #6c757d;">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); padding: 15px; color: white; border-radius: 0 0 8px 8px; margin: 0 10%;">
+                        <div class="d-flex justify-content-between">
+                            <span>Payments</span>
+                            <strong>{{ funnel_data.launch_to_payment.users_with_payment }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <span class="h2 text-primary">{{ funnel_data.launch_to_payment.rate }}%</span>
+                    <p class="text-muted mb-0">Conversion Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Top-up → Generation -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="fas fa-wallet"></i> Top-up → Generation</h6>
+            </div>
+            <div class="card-body">
+                <div class="funnel-visual mb-3">
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); padding: 15px; color: white; border-radius: 8px 8px 0 0;">
+                        <div class="d-flex justify-content-between">
+                            <span>Topped Up</span>
+                            <strong>{{ funnel_data.topup_to_generation.users_topped_up }}</strong>
+                        </div>
+                    </div>
+                    <div class="funnel-arrow text-center" style="font-size: 1.5rem; color: #6c757d;">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); padding: 15px; color: white; border-radius: 0 0 8px 8px; margin: 0 10%;">
+                        <div class="d-flex justify-content-between">
+                            <span>Used Credits</span>
+                            <strong>{{ funnel_data.topup_to_generation.users_used_generations }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <span class="h2 text-success">{{ funnel_data.topup_to_generation.rate }}%</span>
+                    <p class="text-muted mb-0">Conversion Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. First Generation → Repeat -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="fas fa-redo"></i> First Gen → Repeat</h6>
+            </div>
+            <div class="card-body">
+                <div class="funnel-visual mb-3">
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #ffc107 0%, #d39e00 100%); padding: 15px; color: #212529; border-radius: 8px 8px 0 0;">
+                        <div class="d-flex justify-content-between">
+                            <span>First Gen</span>
+                            <strong>{{ funnel_data.first_to_repeat.users_with_generation }}</strong>
+                        </div>
+                    </div>
+                    <div class="funnel-arrow text-center" style="font-size: 1.5rem; color: #6c757d;">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #fd7e14 0%, #c96a11 100%); padding: 15px; color: white; border-radius: 0 0 8px 8px; margin: 0 10%;">
+                        <div class="d-flex justify-content-between">
+                            <span>Repeat</span>
+                            <strong>{{ funnel_data.first_to_repeat.repeat_generators }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <span class="h2 text-warning">{{ funnel_data.first_to_repeat.rate }}%</span>
+                    <p class="text-muted mb-0">Retention Rate</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Request → Result -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="fas fa-check-circle"></i> Request → Result</h6>
+            </div>
+            <div class="card-body">
+                <div class="funnel-visual mb-3">
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #17a2b8 0%, #117a8b 100%); padding: 15px; color: white; border-radius: 8px 8px 0 0;">
+                        <div class="d-flex justify-content-between">
+                            <span>Requests</span>
+                            <strong>{{ funnel_data.request_to_result.total_requests }}</strong>
+                        </div>
+                    </div>
+                    <div class="funnel-arrow text-center" style="font-size: 1.5rem; color: #6c757d;">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="funnel-stage" style="background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); padding: 15px; color: white; border-radius: 0 0 8px 8px; margin: 0 10%;">
+                        <div class="d-flex justify-content-between">
+                            <span>Completed</span>
+                            <strong>{{ funnel_data.request_to_result.finished }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <span class="h2 text-info">{{ funnel_data.request_to_result.rate }}%</span>
+                    <p class="text-muted mb-0">Success Rate</p>
+                    <small class="text-danger">{{ funnel_data.request_to_result.failed }} failed</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="stat-label">Total Launches</div>
+                <div class="stat-value">{{ funnel_data.launch_to_payment.total_launched }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card success">
+            <div class="card-body text-center">
+                <div class="stat-label">Paying Users</div>
+                <div class="stat-value">{{ funnel_data.launch_to_payment.users_with_payment }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card warning">
+            <div class="card-body text-center">
+                <div class="stat-label">Repeat Users</div>
+                <div class="stat-value">{{ funnel_data.first_to_repeat.repeat_generators }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card info">
+            <div class="card-body text-center">
+                <div class="stat-label">Total Generations</div>
+                <div class="stat-value">{{ funnel_data.request_to_result.total_requests }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-users text-primary"></i> Daily Launches vs Payments</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="launchPaymentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-images text-success"></i> Generation Success Rate</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="genSuccessChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Funnel Breakdown Table -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-filter text-secondary"></i> Conversion Funnel Summary</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Funnel Stage</th>
+                                <th class="text-end">Entry</th>
+                                <th class="text-end">Exit</th>
+                                <th class="text-end">Drop-off</th>
+                                <th class="text-end">Conversion</th>
+                                <th>Progress</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><i class="fas fa-rocket text-primary"></i> Launch → Payment</td>
+                                <td class="text-end">{{ funnel_data.launch_to_payment.total_launched }}</td>
+                                <td class="text-end">{{ funnel_data.launch_to_payment.users_with_payment }}</td>
+                                <td class="text-end text-danger">{{ funnel_data.launch_to_payment.total_launched - funnel_data.launch_to_payment.users_with_payment }}</td>
+                                <td class="text-end"><strong>{{ funnel_data.launch_to_payment.rate }}%</strong></td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ funnel_data.launch_to_payment.rate }}%">
+                                            {{ funnel_data.launch_to_payment.rate }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-wallet text-success"></i> Top-up → Generation</td>
+                                <td class="text-end">{{ funnel_data.topup_to_generation.users_topped_up }}</td>
+                                <td class="text-end">{{ funnel_data.topup_to_generation.users_used_generations }}</td>
+                                <td class="text-end text-danger">{{ funnel_data.topup_to_generation.users_topped_up - funnel_data.topup_to_generation.users_used_generations }}</td>
+                                <td class="text-end"><strong>{{ funnel_data.topup_to_generation.rate }}%</strong></td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: {{ funnel_data.topup_to_generation.rate }}%">
+                                            {{ funnel_data.topup_to_generation.rate }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-redo text-warning"></i> First Gen → Repeat</td>
+                                <td class="text-end">{{ funnel_data.first_to_repeat.users_with_generation }}</td>
+                                <td class="text-end">{{ funnel_data.first_to_repeat.repeat_generators }}</td>
+                                <td class="text-end text-danger">{{ funnel_data.first_to_repeat.users_with_generation - funnel_data.first_to_repeat.repeat_generators }}</td>
+                                <td class="text-end"><strong>{{ funnel_data.first_to_repeat.rate }}%</strong></td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-warning" role="progressbar" style="width: {{ funnel_data.first_to_repeat.rate }}%">
+                                            {{ funnel_data.first_to_repeat.rate }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="fas fa-check-circle text-info"></i> Request → Result</td>
+                                <td class="text-end">{{ funnel_data.request_to_result.total_requests }}</td>
+                                <td class="text-end">{{ funnel_data.request_to_result.finished }}</td>
+                                <td class="text-end text-danger">{{ funnel_data.request_to_result.failed }}</td>
+                                <td class="text-end"><strong>{{ funnel_data.request_to_result.rate }}%</strong></td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-info" role="progressbar" style="width: {{ funnel_data.request_to_result.rate }}%">
+                                            {{ funnel_data.request_to_result.rate }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartData = {{ chart_data | safe }};
+
+// Launch vs Payment Chart
+new Chart(document.getElementById('launchPaymentChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: chartData.launch_dates,
+        datasets: [
+            {
+                label: 'Launches',
+                data: chartData.launched,
+                borderColor: 'rgb(0, 123, 255)',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: true,
+                tension: 0.4
+            },
+            {
+                label: 'Payments',
+                data: chartData.paid,
+                borderColor: 'rgb(40, 167, 69)',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                fill: true,
+                tension: 0.4
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } },
+        plugins: {
+            legend: { position: 'top' }
+        }
+    }
+});
+
+// Generation Success Chart
+new Chart(document.getElementById('genSuccessChart').getContext('2d'), {
+    type: 'bar',
+    data: {
+        labels: chartData.gen_dates,
+        datasets: [
+            {
+                label: 'Succeeded',
+                data: chartData.gen_succeeded,
+                backgroundColor: 'rgba(40, 167, 69, 0.7)',
+                borderColor: 'rgb(40, 167, 69)',
+                borderWidth: 1
+            },
+            {
+                label: 'Failed',
+                data: chartData.gen_failed,
+                backgroundColor: 'rgba(220, 53, 69, 0.7)',
+                borderColor: 'rgb(220, 53, 69)',
+                borderWidth: 1
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true }
+        },
+        plugins: {
+            legend: { position: 'top' }
+        }
+    }
+});
+</script>
+{% endblock %}
