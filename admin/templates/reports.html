@@ -1,0 +1,414 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Seedream Admin{% endblock %}
+{% block heading %}Reports & Analytics{% endblock %}
+
+{% block content %}
+<!-- Period Filter & Export -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="btn-group">
+            <a href="/admin/reports?period=7d" class="btn btn-{% if period == '7d' %}primary{% else %}outline-primary{% endif %}">7 Days</a>
+            <a href="/admin/reports?period=30d" class="btn btn-{% if period == '30d' %}primary{% else %}outline-primary{% endif %}">30 Days</a>
+            <a href="/admin/reports?period=90d" class="btn btn-{% if period == '90d' %}primary{% else %}outline-primary{% endif %}">90 Days</a>
+            <a href="/admin/reports?period=all" class="btn btn-{% if period == 'all' %}primary{% else %}outline-primary{% endif %}">All Time</a>
+        </div>
+    </div>
+    <div class="col-md-4 text-end">
+        <div class="btn-group">
+            <a href="/admin/reports/export/csv?period={{ period }}" class="btn btn-success">
+                <i class="fas fa-file-csv"></i> Export CSV
+            </a>
+            <a href="/admin/reports/print?period={{ period }}" target="_blank" class="btn btn-danger">
+                <i class="fas fa-file-pdf"></i> Print/PDF
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-2">
+    <div class="col-12">
+        <small class="text-muted">
+            <i class="fas fa-info-circle"></i>
+            Report period: <strong>{{ report_data.period_label }}</strong> |
+            Generated: {{ report_data.generated_at }}
+        </small>
+    </div>
+</div>
+
+<!-- Unit Economics Cards -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h5 class="text-muted mb-3"><i class="fas fa-calculator"></i> Unit Economics</h5>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="stat-label">Avg Check</div>
+                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.financial.avg_check }}</div>
+                <small class="text-muted">RUB</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card success">
+            <div class="card-body text-center">
+                <div class="stat-label">ARPU</div>
+                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.unit_economics.arpu }}</div>
+                <small class="text-muted">All time</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card warning">
+            <div class="card-body text-center">
+                <div class="stat-label">ARPPU</div>
+                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.unit_economics.arppu }}</div>
+                <small class="text-muted">All time</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card info">
+            <div class="card-body text-center">
+                <div class="stat-label">LTV</div>
+                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.unit_economics.ltv }}</div>
+                <small class="text-muted">Estimated</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <div class="stat-label">Conv. to Pay</div>
+                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.conversions.to_payment }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card stat-card success">
+            <div class="card-body text-center">
+                <div class="stat-label">Conv. to Gen</div>
+                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.conversions.to_generation }}%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users & Financial Metrics -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="fas fa-users"></i> User Metrics</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Total Users</td>
+                            <td class="text-end"><strong>{{ report_data.users.total }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>New Users (Period)</td>
+                            <td class="text-end"><strong class="text-success">+{{ report_data.users.new_period }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Active Users (Period)</td>
+                            <td class="text-end"><strong>{{ report_data.users.active_period }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Users with Balance</td>
+                            <td class="text-end"><strong>{{ report_data.users.with_balance }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Paying Users (Total)</td>
+                            <td class="text-end"><strong>{{ report_data.financial.paying_users_total }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Paying Users (Period)</td>
+                            <td class="text-end"><strong>{{ report_data.financial.paying_users_period }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="fas fa-dollar-sign"></i> Financial Metrics</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Total Revenue (All Time)</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(report_data.financial.total_revenue) }} RUB</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Revenue (Period)</td>
+                            <td class="text-end"><strong class="text-success">{{ "%.2f"|format(report_data.financial.revenue_period) }} RUB</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Transactions (Period)</td>
+                            <td class="text-end"><strong>{{ report_data.financial.tx_count_period }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Average Check</td>
+                            <td class="text-end"><strong>{{ report_data.financial.avg_check }} RUB</strong></td>
+                        </tr>
+                        <tr>
+                            <td>ARPU (Period)</td>
+                            <td class="text-end"><strong>{{ report_data.unit_economics.arpu_period }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>ARPPU (Period)</td>
+                            <td class="text-end"><strong>{{ report_data.unit_economics.arppu_period }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generation & Balance Metrics -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="fas fa-images"></i> Generation Metrics</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Total Generations (Period)</td>
+                            <td class="text-end"><strong>{{ report_data.generations.total }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Successful</td>
+                            <td class="text-end"><strong class="text-success">{{ report_data.generations.successful }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Failed</td>
+                            <td class="text-end"><strong class="text-danger">{{ report_data.generations.failed }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Success Rate</td>
+                            <td class="text-end">
+                                <strong>{{ report_data.generations.success_rate }}%</strong>
+                                <div class="progress mt-1" style="height: 5px;">
+                                    <div class="progress-bar bg-success" style="width: {{ report_data.generations.success_rate }}%"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="fas fa-wallet"></i> User Balance (Aggregated)</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tbody>
+                        <tr>
+                            <td>Total Credits in System</td>
+                            <td class="text-end"><strong>{{ report_data.balance.total_credits }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Average Credits per User</td>
+                            <td class="text-end"><strong>{{ report_data.balance.avg_credits }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Users with Balance > 0</td>
+                            <td class="text-end"><strong>{{ report_data.balance.users_with_balance }}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-chart-line text-success"></i> Revenue Dynamics</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-user-plus text-primary"></i> User Growth Dynamics</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="usersChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Generation Types Popularity -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-pie-chart text-info"></i> Generation Types Popularity</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="genTypesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="fas fa-list-ol"></i> Generation Types Breakdown</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Scenario</th>
+                            <th class="text-end">Count</th>
+                            <th>Share</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set total_gens = report_data.generations.total %}
+                        {% for gt in report_data.gen_types %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><code>{{ gt.scenario }}</code></td>
+                            <td class="text-end">{{ gt.count }}</td>
+                            <td>
+                                {% set pct = (gt.count / total_gens * 100) if total_gens > 0 else 0 %}
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar" style="width: {{ pct }}%">{{ "%.1f"|format(pct) }}%</div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="text-center text-muted py-3">No data</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chartData = {{ chart_data | safe }};
+
+// Revenue Chart
+new Chart(document.getElementById('revenueChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: chartData.revenue_dates,
+        datasets: [{
+            label: 'Revenue',
+            data: chartData.revenue_values,
+            borderColor: 'rgb(40, 167, 69)',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+    }
+});
+
+// Users Growth Chart
+new Chart(document.getElementById('usersChart').getContext('2d'), {
+    type: 'line',
+    data: {
+        labels: chartData.users_dates,
+        datasets: [
+            {
+                label: 'New Users',
+                data: chartData.new_users,
+                borderColor: 'rgb(0, 123, 255)',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: false,
+                tension: 0.4,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Cumulative',
+                data: chartData.cumulative_users,
+                borderColor: 'rgb(108, 117, 125)',
+                backgroundColor: 'rgba(108, 117, 125, 0.1)',
+                fill: false,
+                tension: 0.4,
+                borderDash: [5, 5],
+                yAxisID: 'y1'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: { beginAtZero: true, position: 'left' },
+            y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } }
+        }
+    }
+});
+
+// Generation Types Pie Chart
+new Chart(document.getElementById('genTypesChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels: chartData.gen_types_labels,
+        datasets: [{
+            data: chartData.gen_types_values,
+            backgroundColor: [
+                'rgba(0, 123, 255, 0.7)',
+                'rgba(40, 167, 69, 0.7)',
+                'rgba(255, 193, 7, 0.7)',
+                'rgba(220, 53, 69, 0.7)',
+                'rgba(23, 162, 184, 0.7)',
+                'rgba(108, 117, 125, 0.7)',
+                'rgba(111, 66, 193, 0.7)',
+                'rgba(253, 126, 20, 0.7)',
+                'rgba(32, 201, 151, 0.7)',
+                'rgba(233, 30, 99, 0.7)',
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'right' }
+        }
+    }
+});
+</script>
+{% endblock %}
