@@ -1267,6 +1267,218 @@ async def analytics_page(
         )
 
 
+# ============= Conversions =============
+
+
+@app.get("/admin/conversions", response_class=HTMLResponse)
+async def conversions_page(
+    request: Request,
+    admin: AdminUser = Depends(require_admin),
+    period: str = Query("30d"),
+):
+    """Conversion funnel analytics page."""
+    async with db.session() as session:
+        now = datetime.now(timezone.utc)
+
+        if period == "7d":
+            start_date = now - timedelta(days=7)
+        elif period == "30d":
+            start_date = now - timedelta(days=30)
+        elif period == "90d":
+            start_date = now - timedelta(days=90)
+        elif period == "all":
+            start_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        else:
+            start_date = now - timedelta(days=30)
+
+        from sqlalchemy import text
+
+        # ========== 1. Launch → Payment ==========
+        # Total users who started the bot in this period
+        total_launched = await session.scalar(
+            select(func.count(User.id)).where(User.created_at >= start_date)
+        ) or 0
+
+        # Users who made at least one successful payment in this period
+        users_with_payment = await session.scalar(
+            select(func.count(func.distinct(Transaction.user_id))).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or 0
+
+        launch_to_payment_rate = (users_with_payment / total_launched * 100) if total_launched > 0 else 0
+
+        # ========== 2. Balance Top-up → Use of generations ==========
+        # Users who topped up balance (have successful transactions)
+        users_topped_up = await session.scalar(
+            select(func.count(func.distinct(Transaction.user_id))).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or 0
+
+        # Users who topped up AND then made at least one generation
+        users_topped_and_generated_raw = await session.execute(
+            text("""
+                SELECT COUNT(DISTINCT t.user_id)
+                FROM transactions t
+                INNER JOIN generations g ON t.user_id = g.user_id
+                WHERE t.status = 'succeeded'
+                  AND t.kind = 'purchase'
+                  AND t.created_at >= :start_date
+                  AND g.created_at >= t.created_at
+            """),
+            {"start_date": start_date}
+        )
+        users_topped_and_generated = users_topped_and_generated_raw.scalar() or 0
+
+        topup_to_generation_rate = (users_topped_and_generated / users_topped_up * 100) if users_topped_up > 0 else 0
+
+        # ========== 3. First Generation → Repeat Order ==========
+        # Users who made at least one generation
+        users_with_generation = await session.scalar(
+            select(func.count(func.distinct(Generation.user_id))).where(
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        # Users who made more than one generation (repeat)
+        repeat_generators_raw = await session.execute(
+            text("""
+                SELECT COUNT(*) FROM (
+                    SELECT user_id
+                    FROM generations
+                    WHERE created_at >= :start_date
+                    GROUP BY user_id
+                    HAVING COUNT(*) > 1
+                ) as repeat_users
+            """),
+            {"start_date": start_date}
+        )
+        repeat_generators = repeat_generators_raw.scalar() or 0
+
+        first_to_repeat_rate = (repeat_generators / users_with_generation * 100) if users_with_generation > 0 else 0
+
+        # ========== 4. Generation Request → Finished Result ==========
+        # Total generation requests
+        total_generation_requests = await session.scalar(
+            select(func.count(Generation.id)).where(Generation.created_at >= start_date)
+        ) or 0
+
+        # Successfully finished generations
+        finished_generations = await session.scalar(
+            select(func.count(Generation.id)).where(
+                Generation.status == GenerationStatus.succeeded,
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        request_to_result_rate = (finished_generations / total_generation_requests * 100) if total_generation_requests > 0 else 0
+
+        # Failed generations
+        failed_generations = await session.scalar(
+            select(func.count(Generation.id)).where(
+                Generation.status == GenerationStatus.failed,
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        # ========== Daily conversion data for charts ==========
+        # Daily launch to payment
+        daily_launch_payment_raw = await session.execute(
+            text("""
+                WITH daily_users AS (
+                    SELECT DATE(created_at) as date, COUNT(*) as launched
+                    FROM users
+                    WHERE created_at >= :start_date
+                    GROUP BY DATE(created_at)
+                ),
+                daily_payers AS (
+                    SELECT DATE(created_at) as date, COUNT(DISTINCT user_id) as paid
+                    FROM transactions
+                    WHERE status = 'succeeded' AND kind = 'purchase' AND created_at >= :start_date
+                    GROUP BY DATE(created_at)
+                )
+                SELECT
+                    COALESCE(u.date, p.date) as date,
+                    COALESCE(u.launched, 0) as launched,
+                    COALESCE(p.paid, 0) as paid
+                FROM daily_users u
+                FULL OUTER JOIN daily_payers p ON u.date = p.date
+                ORDER BY date
+            """),
+            {"start_date": start_date}
+        )
+        daily_launch_payment = daily_launch_payment_raw.all()
+
+        # Daily generation success rate
+        daily_gen_success_raw = await session.execute(
+            text("""
+                SELECT
+                    DATE(created_at) as date,
+                    COUNT(*) as total,
+                    SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END) as succeeded,
+                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+                FROM generations
+                WHERE created_at >= :start_date
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            """),
+            {"start_date": start_date}
+        )
+        daily_gen_success = daily_gen_success_raw.all()
+
+        # Prepare chart data
+        chart_data = {
+            "launch_dates": [str(d.date) for d in daily_launch_payment],
+            "launched": [d.launched for d in daily_launch_payment],
+            "paid": [d.paid for d in daily_launch_payment],
+            "gen_dates": [str(d.date) for d in daily_gen_success],
+            "gen_total": [d.total for d in daily_gen_success],
+            "gen_succeeded": [d.succeeded for d in daily_gen_success],
+            "gen_failed": [d.failed for d in daily_gen_success],
+        }
+
+        # Funnel data for visualization
+        funnel_data = {
+            "launch_to_payment": {
+                "total_launched": total_launched,
+                "users_with_payment": users_with_payment,
+                "rate": round(launch_to_payment_rate, 2),
+            },
+            "topup_to_generation": {
+                "users_topped_up": users_topped_up,
+                "users_used_generations": users_topped_and_generated,
+                "rate": round(topup_to_generation_rate, 2),
+            },
+            "first_to_repeat": {
+                "users_with_generation": users_with_generation,
+                "repeat_generators": repeat_generators,
+                "rate": round(first_to_repeat_rate, 2),
+            },
+            "request_to_result": {
+                "total_requests": total_generation_requests,
+                "finished": finished_generations,
+                "failed": failed_generations,
+                "rate": round(request_to_result_rate, 2),
+            },
+        }
+
+        return templates.TemplateResponse(
+            "conversions.html",
+            {
+                "request": request,
+                "admin": admin,
+                "period": period,
+                "funnel_data": funnel_data,
+                "chart_data": json.dumps(chart_data),
+            },
+        )
+
+
 # ============= Export =============
 
 
