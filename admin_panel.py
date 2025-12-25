@@ -1479,6 +1479,558 @@ async def conversions_page(
         )
 
 
+# ============= Reports =============
+
+
+@app.get("/admin/reports", response_class=HTMLResponse)
+async def reports_page(
+    request: Request,
+    admin: AdminUser = Depends(require_admin),
+    period: str = Query("30d"),
+):
+    """Comprehensive reports page with all key metrics and export options."""
+    async with db.session() as session:
+        now = datetime.now(timezone.utc)
+
+        if period == "7d":
+            start_date = now - timedelta(days=7)
+            period_label = "Last 7 Days"
+        elif period == "30d":
+            start_date = now - timedelta(days=30)
+            period_label = "Last 30 Days"
+        elif period == "90d":
+            start_date = now - timedelta(days=90)
+            period_label = "Last 90 Days"
+        elif period == "all":
+            start_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
+            period_label = "All Time"
+        else:
+            start_date = now - timedelta(days=30)
+            period_label = "Last 30 Days"
+
+        from sqlalchemy import text
+
+        # ========== User Metrics ==========
+        total_users = await session.scalar(select(func.count(User.id))) or 0
+        new_users_period = await session.scalar(
+            select(func.count(User.id)).where(User.created_at >= start_date)
+        ) or 0
+        active_users_period = await session.scalar(
+            select(func.count(User.id)).where(User.last_seen_at >= start_date)
+        ) or 0
+
+        # ========== Financial Metrics ==========
+        # Total revenue (all time)
+        total_revenue = await session.scalar(
+            select(func.sum(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or Decimal(0)
+
+        # Revenue for period
+        revenue_period = await session.scalar(
+            select(func.sum(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or Decimal(0)
+
+        # Transaction count
+        tx_count_period = await session.scalar(
+            select(func.count(Transaction.id)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or 0
+
+        # Average check
+        avg_check = await session.scalar(
+            select(func.avg(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or Decimal(0)
+
+        # Paying users
+        paying_users = await session.scalar(
+            select(func.count(func.distinct(Transaction.user_id))).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or 0
+
+        paying_users_period = await session.scalar(
+            select(func.count(func.distinct(Transaction.user_id))).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or 0
+
+        # ========== ARPU / ARPPU / LTV ==========
+        # ARPU = Total Revenue / Total Users
+        arpu = float(total_revenue) / total_users if total_users > 0 else 0
+
+        # ARPPU = Total Revenue / Paying Users
+        arppu = float(total_revenue) / paying_users if paying_users > 0 else 0
+
+        # LTV = ARPPU (simplified, can be enhanced with cohort analysis)
+        ltv = arppu
+
+        # Period ARPU/ARPPU
+        arpu_period = float(revenue_period) / new_users_period if new_users_period > 0 else 0
+        arppu_period = float(revenue_period) / paying_users_period if paying_users_period > 0 else 0
+
+        # ========== Generation Metrics ==========
+        total_generations = await session.scalar(
+            select(func.count(Generation.id)).where(Generation.created_at >= start_date)
+        ) or 0
+
+        successful_generations = await session.scalar(
+            select(func.count(Generation.id)).where(
+                Generation.status == GenerationStatus.succeeded,
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        failed_generations = await session.scalar(
+            select(func.count(Generation.id)).where(
+                Generation.status == GenerationStatus.failed,
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        generation_success_rate = (successful_generations / total_generations * 100) if total_generations > 0 else 0
+
+        # ========== User Balance (Aggregated) ==========
+        total_credits_balance = await session.scalar(
+            select(func.sum(User.credits_balance))
+        ) or 0
+
+        avg_credits_balance = await session.scalar(
+            select(func.avg(User.credits_balance))
+        ) or 0
+
+        users_with_balance = await session.scalar(
+            select(func.count(User.id)).where(User.credits_balance > 0)
+        ) or 0
+
+        # ========== Conversion Metrics ==========
+        # Launch → Payment
+        conversion_to_payment = (paying_users / total_users * 100) if total_users > 0 else 0
+
+        # Users with generations
+        users_with_gen = await session.scalar(
+            select(func.count(func.distinct(Generation.user_id)))
+        ) or 0
+        conversion_to_generation = (users_with_gen / total_users * 100) if total_users > 0 else 0
+
+        # ========== Generation Types Popularity ==========
+        gen_types_raw = await session.execute(
+            text("""
+                SELECT
+                    COALESCE(params->>'scenario', 'unknown') as scenario,
+                    COUNT(*) as count
+                FROM generations
+                WHERE created_at >= :start_date
+                GROUP BY params->>'scenario'
+                ORDER BY count DESC
+                LIMIT 10
+            """),
+            {"start_date": start_date}
+        )
+        gen_types = gen_types_raw.all()
+
+        # ========== Daily Revenue Data ==========
+        daily_revenue_raw = await session.execute(
+            text("""
+                SELECT
+                    DATE(created_at) as date,
+                    SUM(amount) as revenue,
+                    COUNT(*) as tx_count
+                FROM transactions
+                WHERE status = 'succeeded' AND kind = 'purchase' AND created_at >= :start_date
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            """),
+            {"start_date": start_date}
+        )
+        daily_revenue = daily_revenue_raw.all()
+
+        # ========== Daily User Growth ==========
+        daily_users_raw = await session.execute(
+            text("""
+                SELECT
+                    DATE(created_at) as date,
+                    COUNT(*) as new_users,
+                    SUM(COUNT(*)) OVER (ORDER BY DATE(created_at)) as cumulative
+                FROM users
+                WHERE created_at >= :start_date
+                GROUP BY DATE(created_at)
+                ORDER BY date
+            """),
+            {"start_date": start_date}
+        )
+        daily_users = daily_users_raw.all()
+
+        # Prepare all data
+        report_data = {
+            "period": period,
+            "period_label": period_label,
+            "generated_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "users": {
+                "total": total_users,
+                "new_period": new_users_period,
+                "active_period": active_users_period,
+                "with_balance": users_with_balance,
+            },
+            "financial": {
+                "total_revenue": float(total_revenue),
+                "revenue_period": float(revenue_period),
+                "tx_count_period": tx_count_period,
+                "avg_check": round(float(avg_check), 2),
+                "paying_users_total": paying_users,
+                "paying_users_period": paying_users_period,
+            },
+            "unit_economics": {
+                "arpu": round(arpu, 2),
+                "arppu": round(arppu, 2),
+                "ltv": round(ltv, 2),
+                "arpu_period": round(arpu_period, 2),
+                "arppu_period": round(arppu_period, 2),
+            },
+            "generations": {
+                "total": total_generations,
+                "successful": successful_generations,
+                "failed": failed_generations,
+                "success_rate": round(generation_success_rate, 2),
+            },
+            "balance": {
+                "total_credits": total_credits_balance,
+                "avg_credits": round(float(avg_credits_balance), 2),
+                "users_with_balance": users_with_balance,
+            },
+            "conversions": {
+                "to_payment": round(conversion_to_payment, 2),
+                "to_generation": round(conversion_to_generation, 2),
+            },
+            "gen_types": [{"scenario": g.scenario, "count": g.count} for g in gen_types],
+        }
+
+        chart_data = {
+            "revenue_dates": [str(d.date) for d in daily_revenue],
+            "revenue_values": [float(d.revenue) for d in daily_revenue],
+            "tx_counts": [d.tx_count for d in daily_revenue],
+            "users_dates": [str(d.date) for d in daily_users],
+            "new_users": [d.new_users for d in daily_users],
+            "cumulative_users": [d.cumulative for d in daily_users],
+            "gen_types_labels": [g.scenario for g in gen_types],
+            "gen_types_values": [g.count for g in gen_types],
+        }
+
+        return templates.TemplateResponse(
+            "reports.html",
+            {
+                "request": request,
+                "admin": admin,
+                "period": period,
+                "report_data": report_data,
+                "chart_data": json.dumps(chart_data),
+            },
+        )
+
+
+@app.get("/admin/reports/export/csv")
+async def export_report_csv(
+    admin: AdminUser = Depends(require_admin),
+    period: str = Query("30d"),
+):
+    """Export comprehensive report as CSV."""
+    async with db.session() as session:
+        now = datetime.now(timezone.utc)
+
+        if period == "7d":
+            start_date = now - timedelta(days=7)
+        elif period == "30d":
+            start_date = now - timedelta(days=30)
+        elif period == "90d":
+            start_date = now - timedelta(days=90)
+        else:
+            start_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
+
+        from sqlalchemy import text
+
+        # Gather all metrics
+        total_users = await session.scalar(select(func.count(User.id))) or 0
+        new_users = await session.scalar(
+            select(func.count(User.id)).where(User.created_at >= start_date)
+        ) or 0
+        active_users = await session.scalar(
+            select(func.count(User.id)).where(User.last_seen_at >= start_date)
+        ) or 0
+
+        total_revenue = await session.scalar(
+            select(func.sum(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or Decimal(0)
+
+        revenue_period = await session.scalar(
+            select(func.sum(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or Decimal(0)
+
+        avg_check = await session.scalar(
+            select(func.avg(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or Decimal(0)
+
+        paying_users = await session.scalar(
+            select(func.count(func.distinct(Transaction.user_id))).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or 0
+
+        total_generations = await session.scalar(
+            select(func.count(Generation.id)).where(Generation.created_at >= start_date)
+        ) or 0
+
+        successful_gens = await session.scalar(
+            select(func.count(Generation.id)).where(
+                Generation.status == GenerationStatus.succeeded,
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        total_credits = await session.scalar(
+            select(func.sum(User.credits_balance))
+        ) or 0
+
+        # Calculate derived metrics
+        arpu = float(total_revenue) / total_users if total_users > 0 else 0
+        arppu = float(total_revenue) / paying_users if paying_users > 0 else 0
+        success_rate = (successful_gens / total_generations * 100) if total_generations > 0 else 0
+        conversion = (paying_users / total_users * 100) if total_users > 0 else 0
+
+        # Create CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+
+        writer.writerow(["Seedream Bot Analytics Report"])
+        writer.writerow([f"Period: {period}"])
+        writer.writerow([f"Generated: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}"])
+        writer.writerow([])
+
+        writer.writerow(["=== USER METRICS ==="])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Users", total_users])
+        writer.writerow(["New Users (Period)", new_users])
+        writer.writerow(["Active Users (Period)", active_users])
+        writer.writerow([])
+
+        writer.writerow(["=== FINANCIAL METRICS ==="])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Revenue (All Time)", f"{float(total_revenue):.2f}"])
+        writer.writerow(["Revenue (Period)", f"{float(revenue_period):.2f}"])
+        writer.writerow(["Average Check", f"{float(avg_check):.2f}"])
+        writer.writerow(["Paying Users", paying_users])
+        writer.writerow([])
+
+        writer.writerow(["=== UNIT ECONOMICS ==="])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["ARPU", f"{arpu:.2f}"])
+        writer.writerow(["ARPPU", f"{arppu:.2f}"])
+        writer.writerow(["LTV", f"{arppu:.2f}"])
+        writer.writerow(["Conversion to Payment", f"{conversion:.2f}%"])
+        writer.writerow([])
+
+        writer.writerow(["=== GENERATION METRICS ==="])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Generations (Period)", total_generations])
+        writer.writerow(["Successful Generations", successful_gens])
+        writer.writerow(["Success Rate", f"{success_rate:.2f}%"])
+        writer.writerow([])
+
+        writer.writerow(["=== BALANCE METRICS ==="])
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Credits in System", total_credits])
+
+        # Add daily breakdown
+        writer.writerow([])
+        writer.writerow(["=== DAILY REVENUE ==="])
+        writer.writerow(["Date", "Revenue", "Transactions"])
+
+        daily_raw = await session.execute(
+            text("""
+                SELECT DATE(created_at) as date, SUM(amount) as revenue, COUNT(*) as count
+                FROM transactions
+                WHERE status = 'succeeded' AND kind = 'purchase' AND created_at >= :start_date
+                GROUP BY DATE(created_at) ORDER BY date
+            """),
+            {"start_date": start_date}
+        )
+        for row in daily_raw.all():
+            writer.writerow([str(row.date), f"{float(row.revenue):.2f}", row.count])
+
+        output.seek(0)
+        filename = f"seedream_report_{period}_{now.strftime('%Y%m%d')}.csv"
+
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv; charset=utf-8-sig",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+
+@app.get("/admin/reports/print", response_class=HTMLResponse)
+async def print_report(
+    request: Request,
+    admin: AdminUser = Depends(require_admin),
+    period: str = Query("30d"),
+):
+    """Printable report view (can be saved as PDF via browser)."""
+    async with db.session() as session:
+        now = datetime.now(timezone.utc)
+
+        if period == "7d":
+            start_date = now - timedelta(days=7)
+            period_label = "Last 7 Days"
+        elif period == "30d":
+            start_date = now - timedelta(days=30)
+            period_label = "Last 30 Days"
+        elif period == "90d":
+            start_date = now - timedelta(days=90)
+            period_label = "Last 90 Days"
+        else:
+            start_date = datetime(2020, 1, 1, tzinfo=timezone.utc)
+            period_label = "All Time"
+
+        from sqlalchemy import text
+
+        # Gather all metrics (same as reports_page)
+        total_users = await session.scalar(select(func.count(User.id))) or 0
+        new_users = await session.scalar(
+            select(func.count(User.id)).where(User.created_at >= start_date)
+        ) or 0
+        active_users = await session.scalar(
+            select(func.count(User.id)).where(User.last_seen_at >= start_date)
+        ) or 0
+
+        total_revenue = await session.scalar(
+            select(func.sum(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or Decimal(0)
+
+        revenue_period = await session.scalar(
+            select(func.sum(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+                Transaction.created_at >= start_date,
+            )
+        ) or Decimal(0)
+
+        avg_check = await session.scalar(
+            select(func.avg(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or Decimal(0)
+
+        paying_users = await session.scalar(
+            select(func.count(func.distinct(Transaction.user_id))).where(
+                Transaction.status == TransactionStatus.succeeded,
+                Transaction.kind == TransactionKind.purchase,
+            )
+        ) or 0
+
+        total_generations = await session.scalar(
+            select(func.count(Generation.id)).where(Generation.created_at >= start_date)
+        ) or 0
+
+        successful_gens = await session.scalar(
+            select(func.count(Generation.id)).where(
+                Generation.status == GenerationStatus.succeeded,
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        failed_gens = await session.scalar(
+            select(func.count(Generation.id)).where(
+                Generation.status == GenerationStatus.failed,
+                Generation.created_at >= start_date,
+            )
+        ) or 0
+
+        total_credits = await session.scalar(
+            select(func.sum(User.credits_balance))
+        ) or 0
+
+        users_with_balance = await session.scalar(
+            select(func.count(User.id)).where(User.credits_balance > 0)
+        ) or 0
+
+        # Calculate derived metrics
+        arpu = float(total_revenue) / total_users if total_users > 0 else 0
+        arppu = float(total_revenue) / paying_users if paying_users > 0 else 0
+        success_rate = (successful_gens / total_generations * 100) if total_generations > 0 else 0
+        conversion = (paying_users / total_users * 100) if total_users > 0 else 0
+
+        # Generation types
+        gen_types_raw = await session.execute(
+            text("""
+                SELECT COALESCE(params->>'scenario', 'unknown') as scenario, COUNT(*) as count
+                FROM generations WHERE created_at >= :start_date
+                GROUP BY params->>'scenario' ORDER BY count DESC LIMIT 10
+            """),
+            {"start_date": start_date}
+        )
+        gen_types = gen_types_raw.all()
+
+        report_data = {
+            "period_label": period_label,
+            "generated_at": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "total_users": total_users,
+            "new_users": new_users,
+            "active_users": active_users,
+            "total_revenue": float(total_revenue),
+            "revenue_period": float(revenue_period),
+            "avg_check": round(float(avg_check), 2),
+            "paying_users": paying_users,
+            "arpu": round(arpu, 2),
+            "arppu": round(arppu, 2),
+            "ltv": round(arppu, 2),
+            "conversion": round(conversion, 2),
+            "total_generations": total_generations,
+            "successful_gens": successful_gens,
+            "failed_gens": failed_gens,
+            "success_rate": round(success_rate, 2),
+            "total_credits": total_credits,
+            "users_with_balance": users_with_balance,
+            "gen_types": [{"scenario": g.scenario, "count": g.count} for g in gen_types],
+        }
+
+        return templates.TemplateResponse(
+            "report_print.html",
+            {
+                "request": request,
+                "report": report_data,
+            },
+        )
+
+
 # ============= Export =============
 
 
