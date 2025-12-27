@@ -112,16 +112,19 @@ async def shutdown():
 async def init_default_settings():
     """Initialize default system settings, scenario prices, and tariff packages."""
     async with db.session() as session:
-        # Check if settings exist
-        result = await session.execute(select(SystemSetting).where(SystemSetting.key == "free_generations"))
-        if not result.scalar_one_or_none():
-            # Add default settings
-            default_settings = [
-                SystemSetting(key="free_generations", value="3", description="Number of free generations for new users"),
-                SystemSetting(key="base_generation_cost", value="1", description="Base cost of 1 generation in credits"),
-            ]
-            for s in default_settings:
-                session.add(s)
+        # Define all default settings
+        all_default_settings = [
+            ("free_generations", "3", "Number of free generations for new users"),
+            ("base_generation_cost", "1", "Base cost of 1 generation in credits"),
+            ("single_credit_price_rub", "10", "Price of 1 credit in rubles"),
+            ("stars_to_rub_rate", "1.5", "Exchange rate: 1 Telegram Star = X rubles"),
+        ]
+
+        # Add each setting if it doesn't exist
+        for key, value, desc in all_default_settings:
+            result = await session.execute(select(SystemSetting).where(SystemSetting.key == key))
+            if not result.scalar_one_or_none():
+                session.add(SystemSetting(key=key, value=value, description=desc))
 
         # Migrate scenario prices from config to DB if not exists
         result = await session.execute(select(ScenarioPrice).limit(1))

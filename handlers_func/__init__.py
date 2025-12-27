@@ -13,7 +13,20 @@ from .keyboards import (
     build_main_keyboard
 )
 from .i18n_helpers import get_lang, T, T_item, install_bot_commands
-from .db_helpers import Profile, get_profile, ensure_credits_and_create_generation, get_scenario_price
+from .db_helpers import (
+    Profile,
+    get_profile,
+    ensure_credits_and_create_generation,
+    get_scenario_price,
+    get_system_setting,
+    get_free_generations_limit,
+    get_single_credit_price_rub,
+    get_stars_to_rub_rate,
+    calculate_stars_for_rubles,
+    get_active_tariffs,
+    get_tariff_by_id,
+    check_can_generate,
+)
 
 __all__ = [
     # Keyboards
@@ -32,4 +45,12 @@ __all__ = [
     "get_profile",
     "ensure_credits_and_create_generation",
     "get_scenario_price",
+    "get_system_setting",
+    "get_free_generations_limit",
+    "get_single_credit_price_rub",
+    "get_stars_to_rub_rate",
+    "calculate_stars_for_rubles",
+    "get_active_tariffs",
+    "get_tariff_by_id",
+    "check_can_generate",
 ]
