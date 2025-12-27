@@ -45,7 +45,19 @@ import json
 from io import BytesIO
 # Import helper functions from modular structure
 from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands
-from handlers_func.db_helpers import Profile, get_profile, ensure_credits_and_create_generation, get_scenario_price
+from handlers_func.db_helpers import (
+    Profile,
+    get_profile,
+    ensure_credits_and_create_generation,
+    get_scenario_price,
+    get_free_generations_limit,
+    get_single_credit_price_rub,
+    get_stars_to_rub_rate,
+    calculate_stars_for_rubles,
+    get_active_tariffs,
+    get_tariff_by_id,
+    check_can_generate,
+)
 from handlers_func.keyboards import (
     build_lang_kb as _build_lang_kb,
     build_background_keyboard,
@@ -124,6 +136,17 @@ class StarsPay:
             except Exception:
                 pass
 
+        # Parse credits from payload: tariff:{tariff_id}:{credits}:{user_id}
+        # or legacy format: stars_purchase (fallback to amount_stars)
+        credits_to_add = amount_stars  # Default fallback
+        if payload and payload.startswith("tariff:"):
+            parts = payload.split(":")
+            if len(parts) >= 3:
+                try:
+                    credits_to_add = int(parts[2])
+                except ValueError:
+                    credits_to_add = amount_stars
+
         async with self.db.session() as s:
             await upsert_user_basic(
                 s,
@@ -147,15 +170,15 @@ class StarsPay:
                 status=TransactionStatus.succeeded,
                 title="Stars purchase",
                 external_id=charge_id or payload,
-                meta={"payload": payload},
+                meta={"payload": payload, "credits_added": credits_to_add},
             )
 
             db_user = (
                 await s.execute(select(User).where(User.user_id == user_id))
             ).scalar_one_or_none()
             if db_user:
-                # Интерпретируем 1 звезду = 1 кредит генерации
-                db_user.credits_balance = (db_user.credits_balance or 0) + amount_stars
+                # Add credits based on tariff (not Stars amount directly)
+                db_user.credits_balance = (db_user.credits_balance or 0) + credits_to_add
 
         await state.clear()
 
@@ -165,7 +188,7 @@ class StarsPay:
                 lang,
                 "payment_ok",
                 charge_id=charge_id or "-",
-                amount=str(amount_stars),
+                amount=str(credits_to_add),
             )
         )
         logger.info(
@@ -175,6 +198,7 @@ class StarsPay:
                 "invoice_payload": payload,
                 "charge_id": charge_id,
                 "amount_stars": amount_stars,
+                "credits_added": credits_to_add,
             },
         )
 
@@ -259,16 +283,101 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         )
         await message.answer(T(lang, "account_menu"), reply_markup=kb)
 
-    async def _show_payment_method_selection(message: Message, lang: str):
-        """Show payment method selection (Stars or YooKassa)."""
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=T(lang, "btn_pay_stars"), callback_data="pay:stars")],
-                [InlineKeyboardButton(text=T(lang, "btn_pay_yookassa"), callback_data="pay:yookassa")],
-            ]
-        )
-        text = f"{T(lang, 'payment_method_title')}\n\n{T(lang, 'payment_method_desc')}"
-        await message.answer(text, reply_markup=kb)
+    async def _show_tariff_selection(message: Message, lang: str, edit: bool = False):
+        """Show tariff package selection with prices."""
+        async with db.session() as s:
+            tariffs = await get_active_tariffs(s)
+            single_price = await get_single_credit_price_rub(s)
+            stars_rate = await get_stars_to_rub_rate(s)
+
+        buttons = []
+
+        # Add single credit option
+        single_stars = calculate_stars_for_rubles(single_price, stars_rate)
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"1 {T(lang, 'credit')} — {single_price} ₽ / {single_stars} ⭐",
+                callback_data="tariff:single"
+            )
+        ])
+
+        # Add tariff packages
+        for t in tariffs:
+            stars = calculate_stars_for_rubles(t.price, stars_rate)
+            discount_text = f" (-{t.discount_percent}%)" if t.discount_percent else ""
+            buttons.append([
+                InlineKeyboardButton(
+                    text=f"{t.name}: {t.credits} {T(lang, 'credits')} — {t.price} ₽ / {stars} ⭐{discount_text}",
+                    callback_data=f"tariff:{t.id}"
+                )
+            ])
+
+        buttons.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
+
+        kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+        text = f"💳 {T(lang, 'select_tariff')}\n\n{T(lang, 'tariff_desc')}"
+
+        if edit:
+            try:
+                await message.edit_text(text, reply_markup=kb)
+            except Exception:
+                await message.answer(text, reply_markup=kb)
+        else:
+            await message.answer(text, reply_markup=kb)
+
+    async def _show_payment_method_for_tariff(message: Message, lang: str, tariff_id: str, edit: bool = True):
+        """Show payment method selection for a specific tariff."""
+        async with db.session() as s:
+            stars_rate = await get_stars_to_rub_rate(s)
+
+            if tariff_id == "single":
+                single_price = await get_single_credit_price_rub(s)
+                credits = 1
+                price_rub = single_price
+                name = f"1 {T(lang, 'credit')}"
+            else:
+                tariff = await get_tariff_by_id(s, int(tariff_id))
+                if not tariff:
+                    await message.answer(T(lang, "tariff_not_found"))
+                    return
+                credits = tariff.credits
+                price_rub = tariff.price
+                name = tariff.name
+
+        stars = calculate_stars_for_rubles(price_rub, stars_rate)
+
+        buttons = [
+            [InlineKeyboardButton(
+                text=f"⭐ {T(lang, 'btn_pay_stars')} ({stars} Stars)",
+                callback_data=f"pay:stars:{tariff_id}:{credits}:{stars}"
+            )],
+        ]
+
+        # Only show YooKassa if configured
+        if yookassa.enabled:
+            buttons.append([InlineKeyboardButton(
+                text=f"💳 {T(lang, 'btn_pay_yookassa')} ({price_rub} ₽)",
+                callback_data=f"pay:yookassa:{tariff_id}:{credits}:{price_rub}"
+            )])
+        else:
+            buttons.append([InlineKeyboardButton(
+                text=f"💳 {T(lang, 'yookassa_unavailable')}",
+                callback_data="pay:yookassa_disabled"
+            )])
+
+        buttons.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:topup")])
+
+        kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+        text = f"💰 {name}\n\n{T(lang, 'credits')}: {credits}\n{T(lang, 'price')}: {price_rub} ₽ / {stars} ⭐\n\n{T(lang, 'select_payment_method')}"
+
+        if edit:
+            try:
+                await message.edit_text(text, reply_markup=kb)
+            except Exception:
+                await message.answer(text, reply_markup=kb)
+        else:
+            await message.answer(text, reply_markup=kb)
+
     # --- /profile (now Account Menu) ---
 
     async def _show_account_menu(message: Message, lang: str):
@@ -281,17 +390,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             ]
         )
         await message.answer(T(lang, "account_menu"), reply_markup=kb)
-
-    async def _show_payment_method_selection(message: Message, lang: str):
-        """Show payment method selection (Stars or YooKassa)."""
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=T(lang, "btn_pay_stars"), callback_data="pay:stars")],
-                [InlineKeyboardButton(text=T(lang, "btn_pay_yookassa"), callback_data="pay:yookassa")],
-            ]
-        )
-        text = f"{T(lang, 'payment_method_title')}\n\n{T(lang, 'payment_method_desc')}"
-        await message.answer(text, reply_markup=kb)
 
     @r.message(Command("profile"))
     async def cmd_profile(m: Message):
@@ -358,10 +456,24 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
 
     @r.callback_query(F.data == "account:topup")
     async def on_account_topup(q: CallbackQuery, state: FSMContext):
-        """Handle top-up request - show payment method selection."""
+        """Handle top-up request - show tariff selection."""
         lang = await get_lang(q, db)
-        await _show_payment_method_selection(q.message, lang)
+        await _show_tariff_selection(q.message, lang, edit=True)
         await q.answer()
+
+    @r.callback_query(F.data.startswith("tariff:"))
+    async def on_tariff_selected(q: CallbackQuery, state: FSMContext):
+        """Handle tariff package selection."""
+        lang = await get_lang(q, db)
+        tariff_id = q.data.split(":")[1]
+        await _show_payment_method_for_tariff(q.message, lang, tariff_id)
+        await q.answer()
+
+    @r.callback_query(F.data == "pay:yookassa_disabled")
+    async def on_yookassa_disabled(q: CallbackQuery):
+        """Handle click on disabled YooKassa button."""
+        lang = await get_lang(q, db)
+        await q.answer(T(lang, "yookassa_not_configured"), show_alert=True)
 
 
     @r.callback_query(F.data == "account:menu")
@@ -658,42 +770,57 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
     # --- /buy (пополнение звездами) ---
     @r.message(Command("buy"))
     async def cmd_buy(m: Message, state: FSMContext):
-        """Show payment method selection for top-up."""
-        """Show payment method selection for top-up."""
+        """Show tariff selection for top-up."""
         lang = await get_lang(m, db)
-        await _show_payment_method_selection(m, lang)
+        await _show_tariff_selection(m, lang, edit=False)
 
     # --- Payment method selection callbacks ---
 
-    @r.callback_query(F.data == "pay:stars")
+    @r.callback_query(F.data.startswith("pay:stars:"))
     async def on_pay_stars(q: CallbackQuery, state: FSMContext):
         """Handle Telegram Stars payment selection."""
         lang = await get_lang(q, db)
+        # Parse: pay:stars:tariff_id:credits:stars
+        parts = q.data.split(":")
+        tariff_id = parts[2]
+        credits = int(parts[3])
+        stars = int(parts[4])
+
+        # Store payment info in state
+        await state.update_data(
+            pending_credits=credits,
+            pending_tariff=tariff_id,
+        )
+
         await pay.send_invoice(
             q.message,
             state=state,
             title=T(lang, "invoice_title"),
-            desc=T(lang, "invoice_desc"),
-            stars=1,
-            payload=f"demo:{q.from_user.id}",
+            desc=T(lang, "invoice_desc", credits=credits),
+            stars=stars,
+            payload=f"tariff:{tariff_id}:{credits}:{q.from_user.id}",
         )
         await q.answer()
 
-    @r.callback_query(F.data == "pay:yookassa")
+    @r.callback_query(F.data.startswith("pay:yookassa:"))
     async def on_pay_yookassa(q: CallbackQuery, state: FSMContext):
         """Handle YooKassa payment selection - create payment and show link."""
         lang = await get_lang(q, db)
 
         if not yookassa.enabled:
-            await q.message.answer(T(lang, "yookassa_not_configured"))
-            await q.answer()
+            await q.answer(T(lang, "yookassa_not_configured"), show_alert=True)
             return
+
+        # Parse: pay:yookassa:tariff_id:credits:price_rub
+        parts = q.data.split(":")
+        tariff_id = parts[2]
+        credits = int(parts[3])
+        price_rub = Decimal(parts[4])
 
         await q.answer(T(lang, "yookassa_checking"))
 
         # Payment parameters
-        # TODO: Add amount selection UI in future
-        amount = "100.00"  # 100 rubles
+        amount = str(price_rub)
         currency = "RUB"
         description = T(lang, "invoice_title")
         user_id = q.from_user.id
@@ -702,7 +829,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         payment = yookassa.create_payment(
             amount=amount,
             currency=currency,
-            description=f"{description} (User ID: {user_id})",
+            description=f"{description} - {credits} credits (User ID: {user_id})",
             user_id=user_id,
         )
 
@@ -710,12 +837,16 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             await q.message.answer(T(lang, "yookassa_payment_error"))
             return
 
-        # Store payment ID in FSM for later checking
-        await state.update_data(yookassa_payment_id=payment["id"])
+        # Store payment ID and credits in FSM for later checking
+        await state.update_data(
+            yookassa_payment_id=payment["id"],
+            pending_credits=credits,
+            pending_tariff=tariff_id,
+        )
 
         logger.info(
             f"Created YooKassa payment {payment['id']} for user {user_id}, "
-            f"amount {amount} {currency}"
+            f"amount {amount} {currency}, credits {credits}"
         )
 
         # Create keyboard with payment link and check button
@@ -729,7 +860,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                 [
                     InlineKeyboardButton(
                         text=T(lang, "btn_check_payment"),
-                        callback_data=f"yookassa:check:{payment['id']}",
+                        callback_data=f"yookassa:check:{payment['id']}:{credits}",
                     )
                 ],
             ]
@@ -754,9 +885,16 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         """Check YooKassa payment status."""
         lang = await get_lang(q, db)
 
-        # Parse payment ID from callback data
-        payment_id = q.data.split(":", 2)[2]
+        # Parse: yookassa:check:payment_id:credits
+        parts = q.data.split(":")
+        payment_id = parts[2]
+        credits_to_add = int(parts[3]) if len(parts) > 3 else 0
         user_id = q.from_user.id
+
+        # If credits not in callback, try to get from state
+        if credits_to_add == 0:
+            state_data = await state.get_data()
+            credits_to_add = state_data.get("pending_credits", 0)
 
         await q.answer(T(lang, "yookassa_checking"))
 
@@ -778,10 +916,11 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         # Handle different payment statuses
         if status == "succeeded" and paid:
             # Payment successful - update user balance
-            from decimal import Decimal
-
             amount_rubles = Decimal(payment["amount"])
-            credits_to_add = int(amount_rubles)  # 1 ruble = 1 credit
+
+            # If credits still 0, fallback to old calculation
+            if credits_to_add == 0:
+                credits_to_add = int(amount_rubles)
 
             async with db.session() as s:
                 # Update user credits
@@ -801,12 +940,15 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                     currency=payment["currency"],
                     provider="yookassa",
                     status=TransactionStatus.succeeded,
-                    title="YooKassa payment",
+                    title=f"YooKassa payment - {credits_to_add} credits",
                     external_id=payment_id,
-                    meta={"payment_status": status, "user_id": str(user_id)},
+                    meta={"payment_status": status, "user_id": str(user_id), "credits": credits_to_add},
                 )
 
                 await s.commit()
+
+            # Clear pending state
+            await state.update_data(pending_credits=None, pending_tariff=None)
 
             logger.info(
                 f"Added {credits_to_add} credits to user {user_id} from YooKassa payment {payment_id}"
@@ -1090,10 +1232,12 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
                 is_premium=getattr(m.from_user, "is_premium", False),
                 is_bot=m.from_user.is_bot,
             )
-            balance = int(user.credits_balance or 0)
-            initial_price = await get_scenario_price(s, "initial_generation")
+            # Check if user can generate (has credits or free generations)
+            can_gen, user_obj, price, using_free = await check_can_generate(
+                s, tg_user_id=m.from_user.id
+            )
 
-        if balance < initial_price:
+        if not can_gen:
             await m.answer(T(lang, "no_credits"))
             return
 
