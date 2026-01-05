@@ -107,9 +107,9 @@ phrases = {
             "После оплаты баланс будет автоматически пополнен."
         ),
         "payment_ok": (
-            "Оплата звёздами прошла успешно.\n"
+            "Оплата прошла успешно.\n"
             "ID транзакции: {charge_id}\n"
-            "Начислено звёзд: {amount}"
+            "Начислено: {amount}"
         ),
 
         # --- язык ---
@@ -403,6 +403,7 @@ phrases = {
             "Доступ к боту временно ограничен.\n"
             "Для разблокировки обратитесь в техническую поддержку."
         ),
+        "select_tariff": "💳 Выберите желаемый тарифный план.",
 
     },
 
@@ -800,6 +801,7 @@ phrases = {
             "Access to the bot is temporarily restricted.\n"
             "Please contact support to unblock your account."
         ),
+        "select_tariff": "💳 Choose your desired tariff plan."
 
     },
 }

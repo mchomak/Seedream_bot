@@ -1343,12 +1343,23 @@ async def conversions_page(
     request: Request,
     admin: AdminUser = Depends(require_admin),
     period: str = Query("30d"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
 ):
     """Conversion funnel analytics page."""
     async with db.session() as session:
         now = datetime.now(timezone.utc)
+        end_date = now
 
-        if period == "7d":
+        # Handle custom date range
+        if period == "custom" and date_from:
+            try:
+                start_date = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
+                if date_to:
+                    end_date = datetime.fromisoformat(date_to + "T23:59:59").replace(tzinfo=timezone.utc)
+            except:
+                start_date = now - timedelta(days=30)
+        elif period == "7d":
             start_date = now - timedelta(days=7)
         elif period == "30d":
             start_date = now - timedelta(days=30)
@@ -1541,6 +1552,8 @@ async def conversions_page(
                 "request": request,
                 "admin": admin,
                 "period": period,
+                "date_from": date_from or "",
+                "date_to": date_to or "",
                 "funnel_data": funnel_data,
                 "chart_data": json.dumps(chart_data),
             },
@@ -1555,12 +1568,26 @@ async def reports_page(
     request: Request,
     admin: AdminUser = Depends(require_admin),
     period: str = Query("30d"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    ltv_mode: str = Query("paying"),  # "paying" or "all"
 ):
     """Comprehensive reports page with all key metrics and export options."""
     async with db.session() as session:
         now = datetime.now(timezone.utc)
+        end_date = now  # Default end date
 
-        if period == "7d":
+        # Handle custom date range
+        if period == "custom" and date_from:
+            try:
+                start_date = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
+                if date_to:
+                    end_date = datetime.fromisoformat(date_to + "T23:59:59").replace(tzinfo=timezone.utc)
+                period_label = f"Custom: {date_from} to {date_to or 'now'}"
+            except:
+                start_date = now - timedelta(days=30)
+                period_label = "Last 30 Days"
+        elif period == "7d":
             start_date = now - timedelta(days=7)
             period_label = "Last 7 Days"
         elif period == "30d":
@@ -1640,14 +1667,23 @@ async def reports_page(
         ) or 0
 
         # ========== ARPU / ARPPU / LTV ==========
-        # ARPU = Total Revenue / Total Users
+        # ARPU = Total Revenue / Total Users (always calculated from all users)
         arpu = float(total_revenue) / total_users if total_users > 0 else 0
 
         # ARPPU = Total Revenue / Paying Users
         arppu = float(total_revenue) / paying_users if paying_users > 0 else 0
 
-        # LTV = ARPPU (simplified, can be enhanced with cohort analysis)
-        ltv = arppu
+        # LTV and Average Check - based on ltv_mode toggle
+        if ltv_mode == "all":
+            # Calculate based on all users
+            ltv = float(total_revenue) / total_users if total_users > 0 else 0
+            avg_check_display = float(total_revenue) / total_users if total_users > 0 else 0
+            ltv_label = "All Users"
+        else:
+            # Calculate based on paying users only (default)
+            ltv = arppu
+            avg_check_display = float(avg_check) if avg_check else 0
+            ltv_label = "Paying Users Only"
 
         # Period ARPU/ARPPU
         arpu_period = float(revenue_period) / new_users_period if new_users_period > 0 else 0
@@ -1768,6 +1804,8 @@ async def reports_page(
                 "arpu": round(arpu, 2),
                 "arppu": round(arppu, 2),
                 "ltv": round(ltv, 2),
+                "ltv_label": ltv_label,
+                "avg_check_display": round(avg_check_display, 2),
                 "arpu_period": round(arpu_period, 2),
                 "arppu_period": round(arppu_period, 2),
             },
@@ -1806,6 +1844,9 @@ async def reports_page(
                 "request": request,
                 "admin": admin,
                 "period": period,
+                "date_from": date_from or "",
+                "date_to": date_to or "",
+                "ltv_mode": ltv_mode,
                 "report_data": report_data,
                 "chart_data": json.dumps(chart_data),
             },
@@ -2311,10 +2352,12 @@ async def create_backup(
     request: Request,
     admin: AdminUser = Depends(require_admin),
 ):
-    """Create database backup."""
+    """Create database backup using JSON export (works without pg_dump)."""
+    import json
+
     async with db.session() as session:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"backup_{timestamp}.sql"
+        filename = f"backup_{timestamp}.json"
         backup_dir = "data/backups"
         os.makedirs(backup_dir, exist_ok=True)
         filepath = os.path.join(backup_dir, filename)
@@ -2327,44 +2370,147 @@ async def create_backup(
         )
 
         try:
-            # For PostgreSQL, use pg_dump
-            db_url = settings.database_url
-            if "postgresql" in db_url:
-                # Check if pg_dump is available
-                pg_dump_path = shutil.which("pg_dump")
-                if not pg_dump_path:
-                    raise Exception(
-                        "pg_dump command not found. Please install PostgreSQL client tools. "
-                        "On Ubuntu/Debian: apt-get install postgresql-client. "
-                        "On macOS: brew install postgresql. "
-                        "On Windows: install PostgreSQL and add bin folder to PATH."
-                    )
+            # Export all data as JSON (works without pg_dump)
+            backup_data = {
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "tables": {}
+            }
 
-                # Parse connection string
-                import urllib.parse
-                parsed = urllib.parse.urlparse(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+            # Export Users
+            users_result = await session.execute(select(User))
+            users = users_result.scalars().all()
+            backup_data["tables"]["users"] = [
+                {
+                    "id": u.id,
+                    "user_id": u.user_id,
+                    "tg_username": u.tg_username,
+                    "lang": u.lang,
+                    "is_premium": u.is_premium,
+                    "is_bot": u.is_bot,
+                    "is_frozen": u.is_frozen,
+                    "ab_test_group": u.ab_test_group,
+                    "credits_balance": u.credits_balance,
+                    "money_balance": float(u.money_balance) if u.money_balance else 0,
+                    "free_generations_used": u.free_generations_used,
+                    "created_at": u.created_at.isoformat() if u.created_at else None,
+                    "updated_at": u.updated_at.isoformat() if u.updated_at else None,
+                    "last_seen_at": u.last_seen_at.isoformat() if u.last_seen_at else None,
+                    "first_payment_at": u.first_payment_at.isoformat() if u.first_payment_at else None,
+                    "first_generation_at": u.first_generation_at.isoformat() if u.first_generation_at else None,
+                    "subscribed_until": u.subscribed_until.isoformat() if u.subscribed_until else None,
+                    "consent_privacy": u.consent_privacy,
+                }
+                for u in users
+            ]
 
-                env = os.environ.copy()
-                # URL-decode password (handles special characters like @, :, etc.)
-                env["PGPASSWORD"] = urllib.parse.unquote(parsed.password) if parsed.password else ""
+            # Export Transactions
+            tx_result = await session.execute(select(Transaction))
+            transactions = tx_result.scalars().all()
+            backup_data["tables"]["transactions"] = [
+                {
+                    "id": t.id,
+                    "external_id": t.external_id,
+                    "user_id": t.user_id,
+                    "kind": t.kind.value if t.kind else None,
+                    "amount": float(t.amount) if t.amount else 0,
+                    "currency": t.currency,
+                    "provider": t.provider,
+                    "status": t.status.value if t.status else None,
+                    "title": t.title,
+                    "is_suspicious": t.is_suspicious,
+                    "suspicious_reason": t.suspicious_reason,
+                    "meta": t.meta,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                }
+                for t in transactions
+            ]
 
-                cmd = [
-                    pg_dump_path,
-                    "-h", parsed.hostname or "localhost",
-                    "-p", str(parsed.port or 5432),
-                    "-U", urllib.parse.unquote(parsed.username) if parsed.username else "postgres",
-                    "-d", parsed.path.lstrip("/"),
-                    "-f", filepath,
-                ]
+            # Export Generations
+            gen_result = await session.execute(select(Generation))
+            generations = gen_result.scalars().all()
+            backup_data["tables"]["generations"] = [
+                {
+                    "id": g.id,
+                    "user_id": g.user_id,
+                    "prompt": g.prompt,
+                    "status": g.status.value if g.status else None,
+                    "credits_spent": g.credits_spent,
+                    "images_generated": g.images_generated,
+                    "params": g.params,
+                    "source_image_urls": g.source_image_urls,
+                    "error_message": g.error_message,
+                    "created_at": g.created_at.isoformat() if g.created_at else None,
+                    "completed_at": g.completed_at.isoformat() if g.completed_at else None,
+                }
+                for g in generations
+            ]
 
-                result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
-                if result.returncode != 0:
-                    raise Exception(result.stderr or f"pg_dump failed with exit code {result.returncode}")
+            # Export System Settings
+            settings_result = await session.execute(select(SystemSetting))
+            settings_list = settings_result.scalars().all()
+            backup_data["tables"]["system_settings"] = [
+                {
+                    "id": s.id,
+                    "key": s.key,
+                    "value": s.value,
+                    "description": s.description,
+                    "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+                }
+                for s in settings_list
+            ]
 
-                backup_record.file_size = os.path.getsize(filepath)
-            else:
-                backup_record.status = "failed"
-                backup_record.error_message = "Only PostgreSQL backups are supported"
+            # Export Tariff Packages
+            tariff_result = await session.execute(select(TariffPackage))
+            tariffs = tariff_result.scalars().all()
+            backup_data["tables"]["tariff_packages"] = [
+                {
+                    "id": tp.id,
+                    "name": tp.name,
+                    "credits": tp.credits,
+                    "price_rub": float(tp.price_rub) if tp.price_rub else 0,
+                    "price_stars": tp.price_stars,
+                    "is_active": tp.is_active,
+                    "sort_order": tp.sort_order,
+                    "created_at": tp.created_at.isoformat() if tp.created_at else None,
+                }
+                for tp in tariffs
+            ]
+
+            # Write to file
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(backup_data, f, ensure_ascii=False, indent=2)
+
+            backup_record.file_size = os.path.getsize(filepath)
+
+            # Also try pg_dump if available for SQL backup
+            pg_dump_path = shutil.which("pg_dump")
+            if pg_dump_path:
+                try:
+                    sql_filename = f"backup_{timestamp}.sql"
+                    sql_filepath = os.path.join(backup_dir, sql_filename)
+
+                    import urllib.parse
+                    db_url = settings.database_url
+                    parsed = urllib.parse.urlparse(db_url.replace("postgresql+asyncpg://", "postgresql://"))
+
+                    env = os.environ.copy()
+                    env["PGPASSWORD"] = urllib.parse.unquote(parsed.password) if parsed.password else ""
+
+                    cmd = [
+                        pg_dump_path,
+                        "-h", parsed.hostname or "localhost",
+                        "-p", str(parsed.port or 5432),
+                        "-U", urllib.parse.unquote(parsed.username) if parsed.username else "postgres",
+                        "-d", parsed.path.lstrip("/"),
+                        "-f", sql_filepath,
+                    ]
+
+                    result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
+                    if result.returncode == 0:
+                        # Update filename to indicate both formats available
+                        backup_record.filename = f"{filename} (+ SQL)"
+                except:
+                    pass  # SQL backup failed, but JSON backup succeeded
 
         except subprocess.TimeoutExpired:
             backup_record.status = "failed"

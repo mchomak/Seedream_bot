@@ -6,22 +6,68 @@
 {% block content %}
 <!-- Period Filter & Export -->
 <div class="row mb-4">
-    <div class="col-md-8">
-        <div class="btn-group">
-            <a href="/admin/reports?period=7d" class="btn btn-{% if period == '7d' %}primary{% else %}outline-primary{% endif %}">7 Days</a>
-            <a href="/admin/reports?period=30d" class="btn btn-{% if period == '30d' %}primary{% else %}outline-primary{% endif %}">30 Days</a>
-            <a href="/admin/reports?period=90d" class="btn btn-{% if period == '90d' %}primary{% else %}outline-primary{% endif %}">90 Days</a>
-            <a href="/admin/reports?period=all" class="btn btn-{% if period == 'all' %}primary{% else %}outline-primary{% endif %}">All Time</a>
-        </div>
-    </div>
-    <div class="col-md-4 text-end">
-        <div class="btn-group">
-            <a href="/admin/reports/export/csv?period={{ period }}" class="btn btn-success">
-                <i class="fas fa-file-csv"></i> Export CSV
-            </a>
-            <a href="/admin/reports/print?period={{ period }}" target="_blank" class="btn btn-danger">
-                <i class="fas fa-file-pdf"></i> Print/PDF
-            </a>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body py-2">
+                <form method="get" class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <div class="btn-group">
+                            <a href="/admin/reports?period=7d&ltv_mode={{ ltv_mode }}" class="btn btn-sm btn-{% if period == '7d' %}primary{% else %}outline-primary{% endif %}">7 Days</a>
+                            <a href="/admin/reports?period=30d&ltv_mode={{ ltv_mode }}" class="btn btn-sm btn-{% if period == '30d' %}primary{% else %}outline-primary{% endif %}">30 Days</a>
+                            <a href="/admin/reports?period=90d&ltv_mode={{ ltv_mode }}" class="btn btn-sm btn-{% if period == '90d' %}primary{% else %}outline-primary{% endif %}">90 Days</a>
+                            <a href="/admin/reports?period=all&ltv_mode={{ ltv_mode }}" class="btn btn-sm btn-{% if period == 'all' %}primary{% else %}outline-primary{% endif %}">All Time</a>
+                            <button type="button" class="btn btn-sm btn-{% if period == 'custom' %}primary{% else %}outline-primary{% endif %}" data-bs-toggle="collapse" data-bs-target="#customDateRange">
+                                <i class="fas fa-calendar"></i> Custom
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <span class="text-muted mx-2">|</span>
+                        <label class="form-label mb-0 me-2 small">LTV/Avg Check:</label>
+                        <div class="btn-group btn-group-sm">
+                            <a href="/admin/reports?period={{ period }}{% if period == 'custom' %}&date_from={{ date_from }}&date_to={{ date_to }}{% endif %}&ltv_mode=paying"
+                               class="btn btn-{% if ltv_mode == 'paying' %}info{% else %}outline-info{% endif %}">Paying Only</a>
+                            <a href="/admin/reports?period={{ period }}{% if period == 'custom' %}&date_from={{ date_from }}&date_to={{ date_to }}{% endif %}&ltv_mode=all"
+                               class="btn btn-{% if ltv_mode == 'all' %}info{% else %}outline-info{% endif %}">All Users</a>
+                        </div>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <div class="btn-group btn-group-sm">
+                            <a href="/admin/reports/export/csv?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}" class="btn btn-success">
+                                <i class="fas fa-file-csv"></i> CSV
+                            </a>
+                            <a href="/admin/reports/print?period={{ period }}&date_from={{ date_from }}&date_to={{ date_to }}" target="_blank" class="btn btn-danger">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </a>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Custom Date Range Collapse -->
+                <div class="collapse {% if period == 'custom' %}show{% endif %} mt-2" id="customDateRange">
+                    <form method="get" class="row g-2 align-items-center">
+                        <input type="hidden" name="period" value="custom">
+                        <input type="hidden" name="ltv_mode" value="{{ ltv_mode }}">
+                        <div class="col-auto">
+                            <label class="form-label mb-0 small">From:</label>
+                        </div>
+                        <div class="col-auto">
+                            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" required>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label mb-0 small">To:</label>
+                        </div>
+                        <div class="col-auto">
+                            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-filter"></i> Apply
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -45,8 +91,8 @@
         <div class="card stat-card">
             <div class="card-body text-center">
                 <div class="stat-label">Avg Check</div>
-                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.financial.avg_check }}</div>
-                <small class="text-muted">RUB</small>
+                <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.unit_economics.avg_check_display }}</div>
+                <small class="text-muted">{{ report_data.unit_economics.ltv_label }}</small>
             </div>
         </div>
     </div>
@@ -55,7 +101,7 @@
             <div class="card-body text-center">
                 <div class="stat-label">ARPU</div>
                 <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.unit_economics.arpu }}</div>
-                <small class="text-muted">All time</small>
+                <small class="text-muted">All users</small>
             </div>
         </div>
     </div>
@@ -64,7 +110,7 @@
             <div class="card-body text-center">
                 <div class="stat-label">ARPPU</div>
                 <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.unit_economics.arppu }}</div>
-                <small class="text-muted">All time</small>
+                <small class="text-muted">Paying users</small>
             </div>
         </div>
     </div>
@@ -73,7 +119,7 @@
             <div class="card-body text-center">
                 <div class="stat-label">LTV</div>
                 <div class="stat-value" style="font-size: 1.8rem;">{{ report_data.unit_economics.ltv }}</div>
-                <small class="text-muted">Estimated</small>
+                <small class="text-muted">{{ report_data.unit_economics.ltv_label }}</small>
             </div>
         </div>
     </div>

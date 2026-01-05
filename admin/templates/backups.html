@@ -28,9 +28,11 @@
                 <p class="mb-2"><strong>Storage Location:</strong></p>
                 <code>data/backups/</code>
                 <hr>
+                <p class="mb-2 text-muted small">
+                    <strong>JSON Format:</strong> Backups are stored as JSON files containing all database tables (users, transactions, generations, settings, tariffs).
+                </p>
                 <p class="mb-0 text-muted small">
-                    Backups are created using pg_dump and stored as SQL files.
-                    Regular backups are recommended for data safety.
+                    <strong>SQL Format:</strong> If pg_dump is available, an additional SQL backup will be created automatically.
                 </p>
             </div>
         </div>
