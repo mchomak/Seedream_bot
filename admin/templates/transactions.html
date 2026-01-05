@@ -10,7 +10,7 @@
         <form method="get" class="row g-3">
             <div class="col-md-2">
                 <label class="form-label">User ID</label>
-                <input type="number" class="form-control" name="user_id" value="{{ user_id or '' }}" placeholder="Telegram ID">
+                <input type="text" class="form-control" name="user_id" value="{{ user_id }}" placeholder="Telegram ID">
             </div>
             <div class="col-md-2">
                 <label class="form-label">Status</label>
@@ -33,6 +33,23 @@
                 </select>
             </div>
             <div class="col-md-2">
+                <label class="form-label">Provider</label>
+                <select class="form-select" name="provider_filter">
+                    <option value="">All</option>
+                    {% for provider in providers %}
+                    <option value="{{ provider }}" {% if provider_filter == provider %}selected{% endif %}>{{ provider }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Amount Min</label>
+                <input type="number" step="0.01" class="form-control" name="amount_min" value="{{ amount_min }}" placeholder="From">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Amount Max</label>
+                <input type="number" step="0.01" class="form-control" name="amount_max" value="{{ amount_max }}" placeholder="To">
+            </div>
+            <div class="col-md-2">
                 <label class="form-label">Date From</label>
                 <input type="date" class="form-control" name="date_from" value="{{ date_from }}">
             </div>
@@ -47,6 +64,9 @@
                     <label class="form-check-label">Suspicious Only</label>
                 </div>
             </div>
+            <!-- Hidden fields for sorting -->
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+            <input type="hidden" name="sort_order" value="{{ sort_order }}">
             <div class="col-12">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
                 <a href="/admin/transactions" class="btn btn-secondary">Clear</a>
@@ -68,15 +88,48 @@
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>ID</th>
-                        <th>User</th>
-                        <th>Amount</th>
-                        <th>Currency</th>
-                        <th>Kind</th>
-                        <th>Status</th>
-                        <th>Provider</th>
+                        {% set base_url = "/admin/transactions?user_id=" ~ user_id ~ "&status_filter=" ~ status_filter ~ "&kind_filter=" ~ kind_filter ~ "&provider_filter=" ~ provider_filter ~ "&amount_min=" ~ amount_min ~ "&amount_max=" ~ amount_max ~ "&date_from=" ~ date_from ~ "&date_to=" ~ date_to ~ "&suspicious_only=" ~ suspicious_only %}
+                        <th>
+                            <a href="{{ base_url }}&sort_by=id&sort_order={% if sort_by == 'id' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                ID {% if sort_by == 'id' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ base_url }}&sort_by=user_id&sort_order={% if sort_by == 'user_id' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                User {% if sort_by == 'user_id' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ base_url }}&sort_by=amount&sort_order={% if sort_by == 'amount' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                Amount {% if sort_by == 'amount' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ base_url }}&sort_by=currency&sort_order={% if sort_by == 'currency' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                Currency {% if sort_by == 'currency' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ base_url }}&sort_by=kind&sort_order={% if sort_by == 'kind' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                Kind {% if sort_by == 'kind' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ base_url }}&sort_by=status&sort_order={% if sort_by == 'status' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                Status {% if sort_by == 'status' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="{{ base_url }}&sort_by=provider&sort_order={% if sort_by == 'provider' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                Provider {% if sort_by == 'provider' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
                         <th>Suspicious</th>
-                        <th>Date</th>
+                        <th>
+                            <a href="{{ base_url }}&sort_by=created_at&sort_order={% if sort_by == 'created_at' and sort_order == 'asc' %}desc{% else %}asc{% endif %}" class="text-decoration-none text-dark">
+                                Date {% if sort_by == 'created_at' %}<i class="fas fa-sort-{% if sort_order == 'asc' %}up{% else %}down{% endif %}"></i>{% else %}<i class="fas fa-sort text-muted"></i>{% endif %}
+                            </a>
+                        </th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -160,9 +213,10 @@
     <div class="card-footer bg-white">
         <nav>
             <ul class="pagination justify-content-center mb-0">
+                {% set page_url = "/admin/transactions?user_id=" ~ user_id ~ "&status_filter=" ~ status_filter ~ "&kind_filter=" ~ kind_filter ~ "&provider_filter=" ~ provider_filter ~ "&amount_min=" ~ amount_min ~ "&amount_max=" ~ amount_max ~ "&date_from=" ~ date_from ~ "&date_to=" ~ date_to ~ "&suspicious_only=" ~ suspicious_only ~ "&sort_by=" ~ sort_by ~ "&sort_order=" ~ sort_order %}
                 {% if page > 1 %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ page - 1 }}&user_id={{ user_id or '' }}&status_filter={{ status_filter }}&kind_filter={{ kind_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&suspicious_only={{ suspicious_only }}">Previous</a>
+                    <a class="page-link" href="{{ page_url }}&page={{ page - 1 }}">Previous</a>
                 </li>
                 {% endif %}
 
@@ -172,7 +226,7 @@
 
                 {% if page < total_pages %}
                 <li class="page-item">
-                    <a class="page-link" href="?page={{ page + 1 }}&user_id={{ user_id or '' }}&status_filter={{ status_filter }}&kind_filter={{ kind_filter }}&date_from={{ date_from }}&date_to={{ date_to }}&suspicious_only={{ suspicious_only }}">Next</a>
+                    <a class="page-link" href="{{ page_url }}&page={{ page + 1 }}">Next</a>
                 </li>
                 {% endif %}
             </ul>
