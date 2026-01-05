@@ -7,11 +7,46 @@
 <!-- Period Filter -->
 <div class="row mb-4">
     <div class="col-md-12">
-        <div class="btn-group">
-            <a href="/admin/conversions?period=7d" class="btn btn-{% if period == '7d' %}primary{% else %}outline-primary{% endif %}">7 Days</a>
-            <a href="/admin/conversions?period=30d" class="btn btn-{% if period == '30d' %}primary{% else %}outline-primary{% endif %}">30 Days</a>
-            <a href="/admin/conversions?period=90d" class="btn btn-{% if period == '90d' %}primary{% else %}outline-primary{% endif %}">90 Days</a>
-            <a href="/admin/conversions?period=all" class="btn btn-{% if period == 'all' %}primary{% else %}outline-primary{% endif %}">All Time</a>
+        <div class="card">
+            <div class="card-body py-2">
+                <div class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <div class="btn-group">
+                            <a href="/admin/conversions?period=7d" class="btn btn-sm btn-{% if period == '7d' %}primary{% else %}outline-primary{% endif %}">7 Days</a>
+                            <a href="/admin/conversions?period=30d" class="btn btn-sm btn-{% if period == '30d' %}primary{% else %}outline-primary{% endif %}">30 Days</a>
+                            <a href="/admin/conversions?period=90d" class="btn btn-sm btn-{% if period == '90d' %}primary{% else %}outline-primary{% endif %}">90 Days</a>
+                            <a href="/admin/conversions?period=all" class="btn btn-sm btn-{% if period == 'all' %}primary{% else %}outline-primary{% endif %}">All Time</a>
+                            <button type="button" class="btn btn-sm btn-{% if period == 'custom' %}primary{% else %}outline-primary{% endif %}" data-bs-toggle="collapse" data-bs-target="#customDateRange">
+                                <i class="fas fa-calendar"></i> Custom
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom Date Range Collapse -->
+                <div class="collapse {% if period == 'custom' %}show{% endif %} mt-2" id="customDateRange">
+                    <form method="get" class="row g-2 align-items-center">
+                        <input type="hidden" name="period" value="custom">
+                        <div class="col-auto">
+                            <label class="form-label mb-0 small">From:</label>
+                        </div>
+                        <div class="col-auto">
+                            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}" required>
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label mb-0 small">To:</label>
+                        </div>
+                        <div class="col-auto">
+                            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-filter"></i> Apply
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 </div>

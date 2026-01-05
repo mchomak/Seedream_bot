@@ -315,7 +315,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         buttons.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
 
         kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-        text = f"💳 {T(lang, 'select_tariff')}\n\n{T(lang, 'tariff_desc')}"
+        text = T(lang, "select_tariff")
 
         if edit:
             try:
