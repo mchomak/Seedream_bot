@@ -117,6 +117,7 @@ class Settings:
     database_url: str
     redis_url: Optional[str] = None
     seedream_api: Optional[str] = None
+    telegram_admin_ids: tuple[int, ...] = ()  # Telegram user IDs allowed to use admin commands
 
 
 def _to_bool(value: Optional[str], default: bool = False) -> bool:
@@ -140,14 +141,16 @@ def load_env(env_file: str = ".env") -> Settings:
 
     token = (os.getenv("TELEGRAM_BOT_TOKEN") or "").strip()
 
-    database_url = (os.getenv("DATABASE_URL") or "").strip()
-    if database_url.startswith("postgres://"):
-        database_url = "postgresql+asyncpg://" + database_url[len("postgres://"):]
-    elif database_url.startswith("postgresql://"):
-        database_url = "postgresql+asyncpg://" + database_url[len("postgresql://"):]
-
+    database_url = os.getenv("DATABASE_URL").strip()
     redis_url = os.getenv("REDIS_URL")
     seedream_api = os.getenv("SEEDREAM_API")
+
+    # Parse TELEGRAM_ADMIN_IDS (comma-separated list of Telegram user IDs)
+    admin_ids_str = os.getenv("TELEGRAM_ADMIN_IDS", "").strip()
+    telegram_admin_ids = tuple(
+        int(x.strip()) for x in admin_ids_str.split(",")
+        if x.strip().isdigit()
+    )
 
     try:
         app_env = AppEnv(app_env_str)
@@ -178,6 +181,7 @@ def load_env(env_file: str = ".env") -> Settings:
         database_url=database_url,
         redis_url=redis_url,
         seedream_api=seedream_api,
+        telegram_admin_ids=telegram_admin_ids,
     )
 
 

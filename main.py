@@ -72,7 +72,7 @@ async def main() -> None:
     await install_bot_commands(bot, lang="ru")  # or "en"
 
     # 8) Routers: core handlers + tests + diagnostics
-    dp.include_router(build_router(db, seedream, i18n))
+    dp.include_router(build_router(db, seedream, i18n, settings))
     dp.include_router(build_fsm_diag_router(settings.redis_url or ""))
 
     try:

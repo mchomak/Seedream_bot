@@ -29,6 +29,28 @@ i18n = Localizer(
 ).load()
 
 
+def reload_translations() -> bool:
+    """
+    Reload translations from CSV file without restarting the bot.
+    Returns True if successful, False otherwise.
+    """
+    global i18n
+    try:
+        new_i18n = Localizer(
+            LocalizerConfig(
+                path=I18N_PATH,
+                default_lang=DEFAULT_LANG,
+                strict_keys=False,
+            )
+        ).load()
+        i18n = new_i18n
+        logger.info(f"Translations reloaded from {I18N_PATH}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to reload translations: {e}")
+        return False
+
+
 def _supported_lang(code: str | None) -> str:
     """
     Приводит язык к поддерживаемому:
