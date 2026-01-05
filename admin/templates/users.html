@@ -4,6 +4,26 @@
 {% block heading %}Users Management{% endblock %}
 
 {% block content %}
+<!-- Alert Messages -->
+{% if error == 'no_users' %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-circle"></i> Please select at least one user to add to the group.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if error == 'no_group_name' %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-circle"></i> Please enter a group name.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+{% if success == 'group_created' %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="fas fa-check-circle"></i> Group "<strong>{{ created_group }}</strong>" has been assigned to {{ created_count }} user(s).
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
 <!-- Search and Filters -->
 <div class="card mb-4">
     <div class="card-body">
@@ -27,7 +47,43 @@
 
 <div class="d-flex justify-content-between mb-3">
     <span class="badge bg-secondary fs-6">Total: {{ total_users }}</span>
-    <a href="/admin/export/users" class="btn btn-success btn-sm"><i class="fas fa-download"></i> Export CSV</a>
+    <div>
+        <button type="button" class="btn btn-info btn-sm" data-bs-toggle="collapse" data-bs-target="#createGroupPanel">
+            <i class="fas fa-layer-group"></i> Create Group
+        </button>
+        <a href="/admin/export/users" class="btn btn-success btn-sm"><i class="fas fa-download"></i> Export CSV</a>
+    </div>
+</div>
+
+<!-- Create Group Panel -->
+<div class="collapse mb-3" id="createGroupPanel">
+    <div class="card card-body bg-light">
+        <h6><i class="fas fa-layer-group"></i> Create Group</h6>
+        <p class="text-muted small mb-3">Enter a group name and select users below using checkboxes, then click "Save Group".</p>
+
+        <form id="createGroupForm" method="post" action="/admin/users/bulk-group">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-4">
+                    <input type="text" class="form-control" id="groupNameInput" name="group_name" placeholder="Group name (e.g., premium, beta_testers)">
+                </div>
+                <div class="col-auto">
+                    <input type="hidden" id="selectedUserIds" name="user_ids" value="">
+                    <button type="submit" class="btn btn-primary" id="saveGroupBtn">
+                        <i class="fas fa-save"></i> Save Group
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="selectAllBtn">
+                        <i class="fas fa-check-double"></i> Select All
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="deselectAllBtn">
+                        <i class="fas fa-times"></i> Deselect All
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <span class="badge bg-primary" id="selectedCount">0 selected</span>
+                </div>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Users Table -->
@@ -37,9 +93,13 @@
             <table class="table table-hover mb-0">
                 <thead class="table-light">
                     <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox" class="form-check-input" id="checkAll" title="Select all on this page">
+                        </th>
                         <th>Telegram ID</th>
                         <th>Username</th>
                         <th>Credits</th>
+                        <th>Groups</th>
                         <th>Status</th>
                         <th>Language</th>
                         <th>Joined</th>
@@ -50,6 +110,9 @@
                 <tbody>
                     {% for user in users %}
                     <tr class="{% if user.is_frozen %}table-secondary{% endif %}">
+                        <td>
+                            <input type="checkbox" class="form-check-input user-checkbox" value="{{ user.id }}" data-user-id="{{ user.id }}">
+                        </td>
                         <td><code>{{ user.user_id }}</code></td>
                         <td>
                             {% if user.tg_username %}
@@ -63,6 +126,18 @@
                             <span class="badge bg-{% if (user.credits_balance or 0) > 0 %}success{% else %}secondary{% endif %}">
                                 {{ user.credits_balance or 0 }}
                             </span>
+                        </td>
+                        <td>
+                            {% if user.user_groups %}
+                                {% for group in user.user_groups[:2] %}
+                                <span class="badge bg-info me-1">{{ group }}</span>
+                                {% endfor %}
+                                {% if user.user_groups|length > 2 %}
+                                <span class="badge bg-secondary">+{{ user.user_groups|length - 2 }}</span>
+                                {% endif %}
+                            {% else %}
+                            <span class="text-muted small">-</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if user.is_frozen %}
@@ -82,7 +157,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8" class="text-center text-muted py-5">
+                        <td colspan="10" class="text-center text-muted py-5">
                             <i class="fas fa-users fa-3x mb-3 d-block"></i>
                             No users found
                         </td>
@@ -118,4 +193,78 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    const checkAll = document.getElementById('checkAll');
+    const selectedCount = document.getElementById('selectedCount');
+    const selectedUserIds = document.getElementById('selectedUserIds');
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    const createGroupForm = document.getElementById('createGroupForm');
+    const groupNameInput = document.getElementById('groupNameInput');
+
+    function updateSelectedCount() {
+        const checked = document.querySelectorAll('.user-checkbox:checked');
+        selectedCount.textContent = checked.length + ' selected';
+
+        // Update hidden field with selected user IDs
+        const ids = Array.from(checked).map(cb => cb.value);
+        selectedUserIds.value = ids.join(',');
+    }
+
+    // Individual checkbox change
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+    });
+
+    // Check all checkbox
+    checkAll.addEventListener('change', function() {
+        checkboxes.forEach(cb => {
+            cb.checked = this.checked;
+        });
+        updateSelectedCount();
+    });
+
+    // Select all button
+    selectAllBtn.addEventListener('click', function() {
+        checkboxes.forEach(cb => {
+            cb.checked = true;
+        });
+        checkAll.checked = true;
+        updateSelectedCount();
+    });
+
+    // Deselect all button
+    deselectAllBtn.addEventListener('click', function() {
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
+        checkAll.checked = false;
+        updateSelectedCount();
+    });
+
+    // Form validation
+    createGroupForm.addEventListener('submit', function(e) {
+        const groupName = groupNameInput.value.trim();
+        const checkedCount = document.querySelectorAll('.user-checkbox:checked').length;
+
+        if (!groupName) {
+            e.preventDefault();
+            alert('Please enter a group name.');
+            groupNameInput.focus();
+            return false;
+        }
+
+        if (checkedCount === 0) {
+            e.preventDefault();
+            alert('Please select at least one user.');
+            return false;
+        }
+
+        return true;
+    });
+});
+</script>
 {% endblock %}

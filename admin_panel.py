@@ -569,6 +569,10 @@ async def users_list(
     search: Optional[str] = Query(None),
     frozen_only: bool = Query(False),
     page: int = Query(1, ge=1),
+    error: Optional[str] = Query(None),
+    success: Optional[str] = Query(None),
+    group: Optional[str] = Query(None),
+    count: Optional[int] = Query(None),
 ):
     """List users with search and pagination."""
     async with db.session() as session:
@@ -613,6 +617,10 @@ async def users_list(
                 "page": page,
                 "total_pages": total_pages,
                 "total_users": total_users,
+                "error": error,
+                "success": success,
+                "created_group": group,
+                "created_count": count,
             },
         )
 
@@ -766,6 +774,64 @@ async def get_all_groups(admin: AdminUser = Depends(require_admin)):
                     if group:
                         all_groups.add(group)
         return {"groups": sorted(list(all_groups))}
+
+
+@app.post("/admin/users/bulk-group")
+async def bulk_add_group(
+    request: Request,
+    group_name: str = Form(...),
+    user_ids: str = Form(""),
+    admin: AdminUser = Depends(require_admin),
+):
+    """Add a group to multiple users at once."""
+    async with db.session() as session:
+        # Parse user IDs (comma-separated)
+        if not user_ids.strip():
+            return RedirectResponse(
+                "/admin/users?error=no_users",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+
+        if not group_name.strip():
+            return RedirectResponse(
+                "/admin/users?error=no_group_name",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+
+        group_name = group_name.strip()
+        user_id_list = [int(uid.strip()) for uid in user_ids.split(",") if uid.strip().isdigit()]
+
+        if not user_id_list:
+            return RedirectResponse(
+                "/admin/users?error=no_users",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+
+        # Update each user
+        updated_count = 0
+        for user_id in user_id_list:
+            user = await session.get(User, user_id)
+            if user:
+                current_groups = user.user_groups or []
+                if group_name not in current_groups:
+                    current_groups.append(group_name)
+                    user.user_groups = current_groups
+                    updated_count += 1
+
+        await log_admin_action(
+            session,
+            admin_id=admin.id,
+            action="bulk_group_add",
+            target_type="users",
+            target_id=",".join(map(str, user_id_list)),
+            details={"group": group_name, "users_count": updated_count},
+            ip_address=request.client.host,
+        )
+
+    return RedirectResponse(
+        f"/admin/users?success=group_created&group={group_name}&count={updated_count}",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
 
 
 @app.post("/admin/users/{user_id}/send-message")
@@ -1293,12 +1359,23 @@ async def analytics_page(
     request: Request,
     admin: AdminUser = Depends(require_admin),
     period: str = Query("30d"),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
 ):
     """Detailed analytics page."""
     async with db.session() as session:
         now = datetime.now(timezone.utc)
+        end_date = now
 
-        if period == "7d":
+        # Handle custom date range
+        if period == "custom" and date_from:
+            try:
+                start_date = datetime.fromisoformat(date_from).replace(tzinfo=timezone.utc)
+                if date_to:
+                    end_date = datetime.fromisoformat(date_to + "T23:59:59").replace(tzinfo=timezone.utc)
+            except:
+                start_date = now - timedelta(days=30)
+        elif period == "7d":
             start_date = now - timedelta(days=7)
         elif period == "30d":
             start_date = now - timedelta(days=30)
@@ -1389,6 +1466,8 @@ async def analytics_page(
                 "request": request,
                 "admin": admin,
                 "period": period,
+                "date_from": date_from or "",
+                "date_to": date_to or "",
                 "chart_data": json.dumps(chart_data),
                 "total_credits": total_credits,
             },
