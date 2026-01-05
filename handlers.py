@@ -328,7 +328,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         buttons.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
 
         kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-        text = f"💳 {T(lang, 'select_tariff')}\n\n{T(lang, 'tariff_desc')}"
+        text = T(lang, 'select_tariff')
 
         if edit:
             try:
@@ -436,21 +436,18 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         async with db.session() as s:
             prof = await get_profile(s, tg_user_id=q.from_user.id)
-            prof = await get_profile(s, tg_user_id=q.from_user.id)
+            # Get single credit price from DB (configured in admin panel)
+            price_per_gen = await get_single_credit_price_rub(s)
 
         if not prof.user:
             await q.answer(T(lang, "profile_not_found"), show_alert=True)
-            await q.answer(T(lang, "profile_not_found"), show_alert=True)
             return
-
-        # Assuming 1 generation = 10 rubles (you can adjust this)
-        PRICE_PER_GEN = 10
 
         text = (
             f"{T(lang, 'balance_title')}\n\n"
             f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
             f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
-            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
+            f"{T(lang, 'balance_price_per_gen', price=price_per_gen)}"
         )
 
         kb = InlineKeyboardMarkup(
@@ -4881,6 +4878,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         import csv
         import os
         import shutil
+        from datetime import datetime
 
         admin_ids = settings.telegram_admin_ids if settings else ()
         if m.from_user.id not in admin_ids:
@@ -4895,9 +4893,12 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # Download file
         try:
+            logger.info(f"Downloading translations file {doc.file_name} from user {m.from_user.id}")
             file = await bot.get_file(doc.file_id)
             file_bytes = await bot.download_file(file.file_path)
             content = file_bytes.read().decode("utf-8")
+            logger.info(f"Downloaded translations file, size={len(content)} bytes")
+
         except Exception as e:
             logger.error(f"Failed to download translations file: {e}")
             await m.answer("❌ Failed to download file. Please try again.")
@@ -4934,17 +4935,25 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await m.answer("❌ Failed to parse CSV file.")
             return
 
-        # Backup old file and save new one
+        # Rename old file with date and save new one
         try:
             target_path = I18N_PATH  # "locales/phrases.csv"
-            backup_path = target_path + ".backup"
 
-            # Create backup if file exists
+            # Rename old file with today's date
             if os.path.exists(target_path):
-                shutil.copy2(target_path, backup_path)
-                logger.info(f"Backed up old translations to {backup_path}")
+                date_str = datetime.now().strftime("%Y-%m-%d")
+                base_path = target_path.rsplit(".", 1)[0]  # "locales/phrases"
+                backup_path = f"{base_path}_{date_str}.csv"
 
-            # Write new file
+                # If backup for today already exists, add time
+                if os.path.exists(backup_path):
+                    date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+                    backup_path = f"{base_path}_{date_str}.csv"
+
+                os.rename(target_path, backup_path)
+                logger.info(f"Renamed old translations to {backup_path}")
+
+            # Write new file as phrases.csv
             with open(target_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
@@ -4965,17 +4974,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 "Translations are now active without restart."
             )
         else:
-            # Restore backup on failure
-            try:
-                if os.path.exists(backup_path):
-                    shutil.copy2(backup_path, target_path)
-                    reload_translations()
-            except Exception:
-                pass
-
             await m.answer(
                 "⚠️ File saved but failed to reload translations.\n"
-                "Previous translations have been restored.\n"
+                "Bot restart may be required.\n"
                 "Please check the file format."
             )
 
