@@ -296,7 +296,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 )).scalar_one_or_none()
                 if user:
                     user_groups = user.user_groups
-                    logger.debug(f"User {user_id} groups: {user_groups}")
+                    logger.info(f"[A/B] User {user_id} raw user_groups: {repr(user_groups)}, type: {type(user_groups)}")
 
             tariffs = await get_active_tariffs(s, user_groups)
             logger.debug(f"Filtered tariffs for user {user_id}: {[(t.name, t.ab_test_group) for t in tariffs]}")
@@ -1499,7 +1499,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
 
     # --- Обработчик изображения-документа в рамках генерации ---
-    @r.message(F.document)
+    @r.message(GenerationFlow.waiting_document, F.document)
     async def on_document_for_generation(message: Message, state: FSMContext):
         """
         Пользователь присылает фото одежды (как документ) в сценарии генерации.
@@ -1508,12 +1508,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - после каждой загрузки показываем/обновляем сообщение
           'Вы загрузили N вещей. Что вам удобнее?' с двумя сценариями.
         """
-        from fsm import GenerationFlow
-
-        # Реагируем только когда реально ждём документ в GenerationFlow
-        current_state = await state.get_state()
-        if current_state != GenerationFlow.waiting_document.state:
-            return
 
         lang = await get_lang(message, db)
 
@@ -4893,12 +4887,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # Download file
         try:
-            logger.info(f"Downloading translations file {doc.file_name} from user {m.from_user.id}")
             file = await bot.get_file(doc.file_id)
             file_bytes = await bot.download_file(file.file_path)
             content = file_bytes.read().decode("utf-8")
-            logger.info(f"Downloaded translations file, size={len(content)} bytes")
-
         except Exception as e:
             logger.error(f"Failed to download translations file: {e}")
             await m.answer("❌ Failed to download file. Please try again.")
