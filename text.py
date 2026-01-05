@@ -26,7 +26,6 @@ phrases = {
         "balance_title": "💰 <b>Ваш баланс</b>",
         "balance_generations": "Генераций: <b>{count}</b>",
         "balance_rubles": "Рублей: <b>{amount} ₽</b>",
-        "balance_price_per_gen": "Стоимость 1 генерации: <b>{price} ₽</b>",
         "btn_topup": "💳 Пополнить баланс",
 
         # Payment method selection
@@ -434,7 +433,6 @@ phrases = {
         "balance_title": "💰 <b>Your Balance</b>",
         "balance_generations": "Generations: <b>{count}</b>",
         "balance_rubles": "Rubles: <b>{amount} ₽</b>",
-        "balance_price_per_gen": "Price per generation: <b>{price} ₽</b>",
         "btn_topup": "💳 Top Up Balance",
 
         # Payment method selection
