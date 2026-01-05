@@ -58,6 +58,10 @@ class AnyInput(StatesGroup):
     waiting_document = State()
 
 
+class AdminFlow(StatesGroup):
+    waiting_translations_file = State()  # Waiting for CSV file upload
+
+
 class PaymentFlow(StatesGroup):
     waiting = State()  # waiting for successful_payment
 
