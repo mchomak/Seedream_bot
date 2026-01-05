@@ -766,33 +766,67 @@ async def send_user_message(
 async def transactions_list(
     request: Request,
     admin: AdminUser = Depends(require_admin),
-    user_id: Optional[int] = Query(None),
+    user_id: Optional[str] = Query(None),  # Changed to str to handle empty string
     status_filter: Optional[str] = Query(None),
     kind_filter: Optional[str] = Query(None),
+    provider_filter: Optional[str] = Query(None),
+    amount_min: Optional[str] = Query(None),
+    amount_max: Optional[str] = Query(None),
     suspicious_only: bool = Query(False),
     date_from: Optional[str] = Query(None),
     date_to: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query("created_at"),
+    sort_order: Optional[str] = Query("desc"),
     page: int = Query(1, ge=1),
 ):
-    """List transactions with filters."""
+    """List transactions with filters and sorting."""
     async with db.session() as session:
         ITEMS_PER_PAGE = 50
 
         query = select(Transaction)
 
         filters = []
-        if user_id:
-            filters.append(Transaction.user_id == user_id)
+
+        # Parse user_id (handle empty string)
+        parsed_user_id = None
+        if user_id and user_id.strip():
+            try:
+                parsed_user_id = int(user_id.strip())
+                filters.append(Transaction.user_id == parsed_user_id)
+            except ValueError:
+                pass  # Invalid user_id, ignore filter
+
         if status_filter:
             filters.append(Transaction.status == status_filter)
         if kind_filter:
             filters.append(Transaction.kind == kind_filter)
+        if provider_filter:
+            filters.append(Transaction.provider == provider_filter)
+
+        # Amount range filters
+        if amount_min and amount_min.strip():
+            try:
+                filters.append(Transaction.amount >= Decimal(amount_min.strip()))
+            except:
+                pass
+        if amount_max and amount_max.strip():
+            try:
+                filters.append(Transaction.amount <= Decimal(amount_max.strip()))
+            except:
+                pass
+
         if suspicious_only:
             filters.append(Transaction.is_suspicious == True)
         if date_from:
-            filters.append(Transaction.created_at >= datetime.fromisoformat(date_from))
+            try:
+                filters.append(Transaction.created_at >= datetime.fromisoformat(date_from))
+            except:
+                pass
         if date_to:
-            filters.append(Transaction.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+            try:
+                filters.append(Transaction.created_at <= datetime.fromisoformat(date_to + "T23:59:59"))
+            except:
+                pass
 
         if filters:
             query = query.where(and_(*filters))
@@ -800,13 +834,36 @@ async def transactions_list(
         count_query = select(func.count()).select_from(query.subquery())
         total_transactions = await session.scalar(count_query)
 
+        # Sorting
+        sort_column_map = {
+            "id": Transaction.id,
+            "user_id": Transaction.user_id,
+            "amount": Transaction.amount,
+            "currency": Transaction.currency,
+            "kind": Transaction.kind,
+            "status": Transaction.status,
+            "provider": Transaction.provider,
+            "created_at": Transaction.created_at,
+        }
+        sort_column = sort_column_map.get(sort_by, Transaction.created_at)
+        if sort_order == "asc":
+            query = query.order_by(sort_column.asc())
+        else:
+            query = query.order_by(sort_column.desc())
+
         offset = (page - 1) * ITEMS_PER_PAGE
-        query = query.order_by(desc(Transaction.created_at)).offset(offset).limit(ITEMS_PER_PAGE)
+        query = query.offset(offset).limit(ITEMS_PER_PAGE)
 
         result = await session.execute(query)
         transactions = result.scalars().all()
 
         total_pages = (total_transactions + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+
+        # Get unique providers for filter dropdown
+        providers_result = await session.execute(
+            select(Transaction.provider).where(Transaction.provider.isnot(None)).distinct()
+        )
+        providers = [p[0] for p in providers_result.fetchall() if p[0]]
 
         return templates.TemplateResponse(
             "transactions.html",
@@ -814,15 +871,21 @@ async def transactions_list(
                 "request": request,
                 "admin": admin,
                 "transactions": transactions,
-                "user_id": user_id,
+                "user_id": user_id or "",
                 "status_filter": status_filter or "",
                 "kind_filter": kind_filter or "",
+                "provider_filter": provider_filter or "",
+                "amount_min": amount_min or "",
+                "amount_max": amount_max or "",
                 "suspicious_only": suspicious_only,
                 "date_from": date_from or "",
                 "date_to": date_to or "",
+                "sort_by": sort_by or "created_at",
+                "sort_order": sort_order or "desc",
                 "page": page,
                 "total_pages": total_pages,
                 "total_transactions": total_transactions,
+                "providers": providers,
             },
         )
 
