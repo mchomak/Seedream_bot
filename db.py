@@ -631,7 +631,7 @@ async def upsert_user_basic(
         user = User(
             user_id=user_id,
             tg_username=tg_username,
-            lang=lang,
+            lang=lang if lang is not None else "ru",  # Default to Russian for new users
             is_premium=bool(is_premium) if is_premium is not None else False,
             is_bot=bool(is_bot) if is_bot is not None else False,
             last_seen_at=last_seen_at,
