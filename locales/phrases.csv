@@ -1,104 +1,126 @@
-key,en,ru
+key,en,ru,zh,hi,es
 account_frozen,"🚫 <b>Your account is frozen</b>
 
 Access to the bot is temporarily restricted.
 Please contact support to unblock your account.","🚫 <b>Ваш аккаунт заморожен</b>
 
 Доступ к боту временно ограничен.
-Для разблокировки обратитесь в техническую поддержку."
+Для разблокировки обратитесь в техническую поддержку.","🚫 <b>您的账户已被冻结</b>
+
+您目前已暂时无法访问机器人。
+
+如需解除限制，请联系技术支持。","🚫 <b>आपका खाता फ्रीज कर दिया गया है</b>
+
+बॉट तक पहुंच अस्थायी रूप से प्रतिबंधित कर दी गई है।
+इसे अनब्लॉक करने के लिए, कृपया तकनीकी सहायता से संपर्क करें।","🚫 <b>您的账户已被冻结</b>
+
+您目前已暂时无法访问机器人.
+
+如需解除限制，请联系技术支持。"
 account_menu,"👤 <b>My Account</b>
 
 Choose a section:","👤 <b>Мой аккаунт</b>
 
-Выберите раздел:"
-all_base_photos_complete,All base photos processed!,Все базовые фотографии обработаны!
-all_photos_reviewed,All photos reviewed. You have {approved} approved photo(s).,Все фотографии просмотрены. У вас есть {approved} утверждённых фото.
-angles_base_photo,Base photo:,Базовое фото:
-angles_intro,Add new poses and camera angles to create a product profile based on this photo.,Добавьте новые позы и ракурсы для создания профиля товара на основе этого фото.
-aspect_need_one,Please select at least one aspect ratio to continue.,"Выберите хотя бы одно соотношение сторон, чтобы продолжить."
-aspect_selected_header,Selected aspect ratios:,Выбранные соотношения сторон:
-background_need_one,Please select at least one background color to continue.,"Выберите хотя бы один цвет фона, чтобы продолжить."
+Выберите раздел:","👤 <b>我的账户</b>
+
+选择一个版块：","👤 <b>मेरा खाता</b>
+
+एक अनुभाग चुनें:","👤 <b>我的账户</b>
+
+选择一个版块:"
+all_base_photos_complete,All base photos processed!,Все базовые фотографии обработаны!,所有底片均已处理完毕！,सभी मूल तस्वीरों को संसाधित कर लिया गया है!,所有底片均已处理完毕！
+all_photos_reviewed,All photos reviewed. You have {approved} approved photo(s).,Все фотографии просмотрены. У вас есть {approved} утверждённых фото.,所有照片均已审核。您有{approved}张已审核通过的照片。,सभी तस्वीरों की समीक्षा हो चुकी है। आपने तस्वीरों को {मंजूर} कर दिया है।,所有照片均已审核。您有{aprobado}张已核通过的照片。
+angles_base_photo,Base photo:,Базовое фото:,底图：,मूल तस्वीर:,底图：
+angles_intro,Add new poses and camera angles to create a product profile based on this photo.,Добавьте новые позы и ракурсы для создания профиля товара на основе этого фото.,添加新的姿势和角度，根据这张照片创建产品简介。,इस फोटो के आधार पर उत्पाद प्रोफाइल बनाने के लिए नए पोज और एंगल जोड़ें।,"添加新的姿势和角度,根据这张照片创建产品简介."
+aspect_need_one,Please select at least one aspect ratio to continue.,"Выберите хотя бы одно соотношение сторон, чтобы продолжить.",请至少选择一个宽高比以继续。,आगे बढ़ने के लिए कृपया कम से कम एक आस्पेक्ट रेशियो चुनें।,请至少选择一个宽高比以继续.
+aspect_selected_header,Selected aspect ratios:,Выбранные соотношения сторон:,选定的宽高比：,चयनित पहलू अनुपात:,选定的宽高比:
+background_need_one,Please select at least one background color to continue.,"Выберите хотя бы один цвет фона, чтобы продолжить.",请至少选择一种背景颜色以继续。,आगे बढ़ने के लिए कृपया कम से कम एक पृष्ठभूमि रंग चुनें।,请至少选择一种背景颜色以继续.
 background_select_single,"Select one or more background colors to generate photos of your items on a model.
 IMPORTANT: If you select multiple backgrounds, the number of generated photos will be multiplied by the number of uploaded items.","Выберите один или несколько цветов фона для создания фото ваших вещей на модели.
-ВАЖНО: При выборе нескольких фонов генерируется соответствующее количество фотографий, перемноженное на количество загруженных вещей."
-background_selected_header,Selected background colors:,Выбранные цвета фона:
-balance_generations,Generations: <b>{count}</b>,Генераций: <b>{count}</b>
-balance_price_per_gen,Price per generation: <b>{price} ₽</b>,Стоимость 1 генерации: <b>{price} ₽</b>
-balance_rubles,Rubles: <b>{amount} ₽</b>,Рублей: <b>{amount} ₽</b>
-balance_title,💰 <b>Your Balance</b>,💰 <b>Ваш баланс</b>
-bg_label_beige,beige,бежевый
-bg_label_black,black,чёрный
-bg_label_pink,pink,розовый
-bg_label_white,white,белый
-btn_add_rear_view,🔄 Add rear view,🔄 Добавить вид сзади
-btn_age_child,Child,Ребёнок
-btn_age_senior,Senior,Пожилой
-btn_age_teen,Teenager,Подросток
-btn_age_young,Young adult (default),Молодой взрослый (по умолчанию)
-btn_approve,✅ Approve,✅ Утвердить
-btn_aspect_16_9,16:9 (4096x2304) — wide,16:9 (4096x2304) — широкий
-btn_aspect_1_1,1:1 (4096x4096) — square,1:1 (4096x4096) — квадрат
-btn_aspect_3_4,3:4 (3072x4096) — marketplaces,3:4 (3072x4096) — маркетплейсы
-btn_aspect_9_16,9:16 (2304x4096) — stories,9:16 (2304x4096) — сторис
-btn_back,Back,Назад
-btn_balance,💰 Balance,💰 Баланс
-btn_bg_beige,Beige background,Бежевый фон
-btn_bg_black,Black background,Чёрный фон
-btn_bg_pink,Pink background,Розовый фон
-btn_bg_white,White background,Белый фон
-btn_change_angle,📐 Change angle,📐 Сменить ракурс
-btn_change_angle_5x,📐📐📐 Change angle 5 times,📐📐📐 Сменить ракурс 5 раз
-btn_change_pose,🧍 Change pose,🧍 Сменить позу
-btn_change_pose_5x,🧍🧍🧍 Change pose 5 times,🧍🧍🧍 Сменить позу 5 раз
-btn_check_payment,✅ Check Payment Status,✅ Проверить оплату
-btn_confirm_next,Next,Далее
-btn_confirm_topup,Top up balance,Пополнить баланс
-btn_continue_variants,➡️ Continue,➡️ Продолжить
-btn_create_new_payment,🔄 Create New Payment,🔄 Создать новый платеж
-btn_download,⬇️ Download,⬇️ Скачать
-btn_finish_photo,✅ Finish,✅ Завершить
-btn_full_body,👤 Full body (beta),👤 В полный рост (бета)
-btn_gender_female,Female,Женщина
-btn_gender_male,Male,Мужчина
-btn_hair_any,Any,Любой
-btn_hair_dark,Dark,Тёмные
-btn_hair_light,Light,Светлые
-btn_history,📜 History,📜 История
-btn_lower_body,👖 Lower body (beta),👖 Низ тела (бета)
-btn_mode_all_items,Use the same settings for all items (faster),Задать единые настройки для всех вещей (быстрее)
-btn_mode_per_item,Set settings for each item separately,Задать настройки для каждой вещи отдельно
-btn_next,Next,Далее
-btn_next_page,Next ▶️,Вперёд ▶️
-btn_no_continue,"❌ No, continue","❌ Нет, продолжить"
-btn_no_rear_photo,❌ I don't have a photo from behind (less effective),❌ У меня нет фото сзади (менее эффективно)
-btn_pay_now,💳 Proceed to Payment,💳 Перейти к оплате
-btn_pay_stars,⭐️ Telegram Stars,⭐️ Telegram Stars
-btn_pay_yookassa,💳 Bank Card (YooKassa),💳 Банковская карта (YooKassa)
-btn_prev_page,◀️ Previous,◀️ Назад
-btn_redo,🔄 Redo,🔄 Переделать
-btn_redo_new,⚙️ Redo with new settings,⚙️ Переделать с новыми настройками
-btn_redo_same,🔄 Redo with same settings,🔄 Переделать с теми же настройками
-btn_redo_variant,🔄 Redo,🔄 Переделать
-btn_reject,❌ Reject,❌ Отклонить
-btn_return_menu,🏠 Return to main menu,🏠 Вернуться в главное меню
-btn_start,Start,Начать
-btn_style_casual,Casual,Кэжуал
-btn_style_luxury,Luxury,Люксовый
-btn_style_sport,Sport,Спортивный
-btn_style_strict,Strict,Строгий
-btn_topup,💳 Top Up Balance,💳 Пополнить баланс
-btn_topup_balance,💳 Top up balance,💳 Пополнить баланс
-btn_upload_flat,Clothing only,Фото одежды
-btn_upload_on_mannequin,On a mannequin,Фото на манекене
-btn_upload_on_person,On a person,Фото на человеке
-btn_upper_body,👔 Upper body (beta),👔 Верх тела (бета)
-btn_use_as_base,🎨 Use as Base,🎨 Использовать как базу
-btn_yes_finish,"✅ Yes, finish","✅ Да, завершить"
-cancel_done,Current scenario has been cancelled. You are back to the main menu.,Текущий сценарий отменён. Вы в главном меню.
-choose_lang_title,Choose interface language:,Выберите язык интерфейса:
-confirm_finish_photo,Are you sure you want to finish with this photo?,"Вы уверены, что хотите завершить работу с этим фото?"
-confirm_generation_not_enough,You don't have enough generations. Top up via /buy or reduce the number of requested images.,Недостаточно генераций на балансе. Пополните баланс через /buy или уменьшите количество запрашиваемых фото.
-confirm_generation_ok,Tap “Next” to start generation.,"Нажмите «Далее», чтобы создать фотографии."
+ВАЖНО: При выборе нескольких фонов генерируется соответствующее количество фотографий, перемноженное на количество загруженных вещей.","选择一种或多种背景颜色，即可在模特身上拍摄商品照片。
+
+重要提示：选择多种背景颜色将生成相应数量的照片，照片数量为上传商品数量的乘积。","मॉडल पर अपने आइटम की तस्वीरें बनाने के लिए एक या अधिक बैकग्राउंड रंग चुनें।
+महत्वपूर्ण: एक से अधिक बैकग्राउंड चुनने पर अपलोड किए गए आइटम की संख्या को फोटो की संख्या से गुणा करके उतनी ही संख्या में तस्वीरें बनेंगी।","选择一种或多种背景颜色,即可在模特身上拍摄商品照片.
+
+重要提示：选择多种背景颜色将生成相应数量的照片，照片数量为上传商品数量的乘积。"
+background_selected_header,Selected background colors:,Выбранные цвета фона:,选定的背景颜色：,चयनित पृष्ठभूमि रंग:,选定的背景颜色:
+balance_generations,Generations: <b>{count}</b>,Генераций: <b>{count}</b>,世代数：<b>{count}</b>,पीढ़ियाँ: <b>{count}</b>,世代数:<b>{count}</b>
+balance_price_per_gen,Price per generation: <b>{price} ₽</b>,Стоимость 1 генерации: <b>{price} ₽</b>,一代成本：<b>{price} ₽</b>,एक पीढ़ी की लागत: ₽</b>,一代成本:<b>{precio} ₽</b>
+balance_rubles,Rubles: <b>{amount} ₽</b>,Рублей: <b>{amount} ₽</b>,卢布：<b>{金额} ₽</b>,रूबल: <b>{राशि} ₽</b>,卢布：<b>{金额} ₽</b>
+balance_title,💰 <b>Your Balance</b>,💰 <b>Ваш баланс</b>,💰 <b>您的余额</b>,💰 <b>आपका बैलेंस</b>,💰 <b>您的余额</b>
+bg_label_beige,beige,бежевый,浅褐色的,बेज,浅褐色的
+bg_label_black,black,чёрный,黑色的,काला,黑色的
+bg_label_pink,pink,розовый,粉色的,गुलाबी,粉色的
+bg_label_white,white,белый,白色的,सफ़ेद,白色的
+btn_add_rear_view,🔄 Add rear view,🔄 Добавить вид сзади,🔄 添加后视图,🔄 पीछे का दृश्य जोड़ें,🔄 添加后视图
+btn_age_child,Child,Ребёнок,孩子,बच्चा,孩子
+btn_age_senior,Senior,Пожилой,老年,बुज़ुर्ग,老年
+btn_age_teen,Teenager,Подросток,青少年,किशोर,青少年
+btn_age_young,Young adult (default),Молодой взрослый (по умолчанию),青年（默认）,युवा वयस्क (डिफ़ॉल्ट),青年（默认）
+btn_approve,✅ Approve,✅ Утвердить,✅ 批准,✅ अनुमोदन करें,✅批准
+btn_aspect_16_9,16:9 (4096x2304) — wide,16:9 (4096x2304) — широкий,16:9 (4096x2304) - 宽屏,16:9 (4096x2304) - चौड़ा,16:9 (4096x2304) - 宽屏
+btn_aspect_1_1,1:1 (4096x4096) — square,1:1 (4096x4096) — квадрат,1:1 (4096x4096) - 正方形,1:1 (4096x4096) - वर्ग,1:1 (4096x4096) - 正方形
+btn_aspect_3_4,3:4 (3072x4096) — marketplaces,3:4 (3072x4096) — маркетплейсы,3:4 (3072x4096) - 市场,3:4 (3072x4096) - बाज़ार,3:4 (3072x4096) - 市场
+btn_aspect_9_16,9:16 (2304x4096) — stories,9:16 (2304x4096) — сторис,9:16 (2304x4096) — 故事,9:16 (2304x4096) — कहानी,9:16 (2304x4096) — 故事
+btn_back,Back,Назад,后退,पीछे,后退
+btn_balance,💰 Balance,💰 Баланс,💰 平衡,💰 संतुलन,💰 平衡
+btn_bg_beige,Beige background,Бежевый фон,米色背景,बेज पृष्ठभूमि,米色背景
+btn_bg_black,Black background,Чёрный фон,黑色背景,काली पृष्ठभूमि,黑色背景
+btn_bg_pink,Pink background,Розовый фон,粉色背景,गुलाबी पृष्ठभूमि,粉色背景
+btn_bg_white,White background,Белый фон,白色背景,सफेद पृष्ठभूमि,白色背景
+btn_change_angle,📐 Change angle,📐 Сменить ракурс,📐 改变角度,📐 कोण बदलें,📐改变角度
+btn_change_angle_5x,📐📐📐 Change angle 5 times,📐📐📐 Сменить ракурс 5 раз,📐📐📐 改变角度 5 次,📐📐📐 कोण को 5 बार बदलें,📐📐📐 改变角度 5次
+btn_change_pose,🧍 Change pose,🧍 Сменить позу,🧍 改变你的姿势,🧍 अपनी स्थिति बदलें,🧍 改变你的姿势
+btn_change_pose_5x,🧍🧍🧍 Change pose 5 times,🧍🧍🧍 Сменить позу 5 раз,🧍🧍🧍 换位 5 次,🧍🧍🧍 5 बार अपनी स्थिति बदलें,🧍🧍🧍 5次
+btn_check_payment,✅ Check Payment Status,✅ Проверить оплату,✅ 检查付款,✅ चेक से भुगतान करें,✅ 检查付款
+btn_confirm_next,Next,Далее,下一个,अगला,下一个
+btn_confirm_topup,Top up balance,Пополнить баланс,充值余额,अपना बैलेंस टॉप अप करें,充值余额
+btn_continue_variants,➡️ Continue,➡️ Продолжить,➡️ 继续,➡️ जारी रखें,➡️ 继续
+btn_create_new_payment,🔄 Create New Payment,🔄 Создать новый платеж,🔄 创建新的付款方式,🔄 नया भुगतान बनाएं,🔄 创建新的付款方式
+btn_download,⬇️ Download,⬇️ Скачать,⬇️ 下载,⬇️ डाउनलोड करें,⬇️下载
+btn_finish_photo,✅ Finish,✅ Завершить,✅ 已完成,✅ पूर्ण,✅ 已完成
+btn_full_body,👤 Full body (beta),👤 В полный рост (бета),👤完整版（测试版）,👤 पूर्ण संस्करण (बीटा),👤完整版（测试版）
+btn_gender_female,Female,Женщина,女士,महिला,女士
+btn_gender_male,Male,Мужчина,男人,आदमी,男人
+btn_hair_any,Any,Любой,任何,कोई,任何
+btn_hair_dark,Dark,Тёмные,黑暗的,अँधेरा,黑暗的
+btn_hair_light,Light,Светлые,光,रोशनी,光
+btn_history,📜 History,📜 История,📜 历史,📜 इतिहास,📜 历史
+btn_lower_body,👖 Lower body (beta),👖 Низ тела (бета),👖 下半身（测试版）,👖 निचला शरीर (बीटा),👖下半身（测试版）
+btn_mode_all_items,Use the same settings for all items (faster),Задать единые настройки для всех вещей (быстрее),为所有事物设置统一参数（速度更快）,सभी चीजों के लिए एक समान सेटिंग्स सेट करें (तेजी से),为所有事物设置统一参数（速度更快）
+btn_mode_per_item,Set settings for each item separately,Задать настройки для каждой вещи отдельно,分别设置每个项目的参数。,प्रत्येक आइटम के लिए सेटिंग्स अलग-अलग सेट करें,分别设置每个项目的参数.
+btn_next,Next,Далее,下一个,अगला,下一个
+btn_next_page,Next ▶️,Вперёд ▶️,前进 ▶️,आगे बढ़ें ▶️,前进 ▶️
+btn_no_continue,"❌ No, continue","❌ Нет, продолжить",❌ 不，继续,"❌ नहीं, जारी रखें",❌不，继续
+btn_no_rear_photo,❌ I don't have a photo from behind (less effective),❌ У меня нет фото сзади (менее эффективно),❌ 我没有背面的照片（效果不太好）。,❌ मेरे पास पीछे से ली गई कोई तस्वीर नहीं है (कम प्रभावी)।,❌ 我没有背面的照片（效果不太好）.
+btn_pay_now,💳 Proceed to Payment,💳 Перейти к оплате,💳 前往付款,💳 भुगतान के लिए आगे बढ़ें,💳 前往付款
+btn_pay_stars,⭐️ Telegram Stars,⭐️ Telegram Stars,⭐️ Telegram 明星,⭐️ टेलीग्राम स्टार्स,⭐️ Telegrama
+btn_pay_yookassa,💳 Bank Card (YooKassa),💳 Банковская карта (YooKassa),💳 银行卡（YooKassa）,💳 बैंक कार्ड (YooKassa),💳 银行卡（YooKassa）
+btn_prev_page,◀️ Previous,◀️ Назад,◀️ 返回,◀️ वापस,◀️返回
+btn_redo,🔄 Redo,🔄 Переделать,🔄 重制版,🔄 रीमेक,🔄 重制版
+btn_redo_new,⚙️ Redo with new settings,⚙️ Переделать с новыми настройками,⚙️ 使用新设置重新制作,⚙️ नई सेटिंग्स के साथ रीमेक किया गया,⚙️ 使用新设置重新制作
+btn_redo_same,🔄 Redo with same settings,🔄 Переделать с теми же настройками,🔄 使用相同的设置重新操作,🔄 समान सेटिंग्स के साथ दोबारा करें,🔄 使用相同的设置重新操作
+btn_redo_variant,🔄 Redo,🔄 Переделать,🔄 重制版,🔄 रीमेक,🔄 重制版
+btn_reject,❌ Reject,❌ Отклонить,❌拒绝,❌ अस्वीकार करें,❌拒绝
+btn_return_menu,🏠 Return to main menu,🏠 Вернуться в главное меню,🏠 返回主菜单,🏠 मुख्य मेनू पर वापस जाएँ,🏠返回主菜单
+btn_start,Start,Начать,开始,शुरू,开始
+btn_style_casual,Casual,Кэжуал,随意的,अनौपचारिक,随意的
+btn_style_luxury,Luxury,Люксовый,奢华,विलासिता,奢华
+btn_style_sport,Sport,Спортивный,运动的,खेल,运动的
+btn_style_strict,Strict,Строгий,严格的,कठोर,严格的
+btn_topup,💳 Top Up Balance,💳 Пополнить баланс,💳 充值余额,💳 अपना बैलेंस टॉप अप करें,💳 充值余额
+btn_topup_balance,💳 Top up balance,💳 Пополнить баланс,💳 充值余额,💳 अपना बैलेंस टॉप अप करें,💳 充值余额
+btn_upload_flat,Clothing only,Фото одежды,服装照片,कपड़ों की तस्वीरें,服装fotos
+btn_upload_on_mannequin,On a mannequin,Фото на манекене,人体模型上的照片,एक पुतले पर लगी तस्वीर,人体模型上的fotos
+btn_upload_on_person,On a person,Фото на человеке,人像照片,किसी व्यक्ति की तस्वीर,人像fotos
+btn_upper_body,👔 Upper body (beta),👔 Верх тела (бета),👔 上半身（测试版）,👔 ऊपरी शरीर (बीटा),👔 上半身（测试版）
+btn_use_as_base,🎨 Use as Base,🎨 Использовать как базу,🎨 用作底座,🎨 इसे बेस के रूप में इस्तेमाल करें,🎨 用作底座
+btn_yes_finish,"✅ Yes, finish","✅ Да, завершить",✅ 是的，已完成,"✅ हाँ, पूरा",✅ 是的，已完成
+cancel_done,Current scenario has been cancelled. You are back to the main menu.,Текущий сценарий отменён. Вы в главном меню.,当前场景已取消。您已返回主菜单。,वर्तमान परिदृश्य रद्द कर दिया गया है। आप मुख्य मेनू पर वापस आ गए हैं।,当前场景已取消。您已返回主菜单。
+choose_lang_title,Choose interface language:,Выберите язык интерфейса:,选择界面语言：,इंटरफ़ेस भाषा चुनें:,选择界面语言:
+confirm_finish_photo,Are you sure you want to finish with this photo?,"Вы уверены, что хотите завершить работу с этим фото?",你确定要完成对这张照片的处理吗？,क्या आप वाकई इस फोटो पर काम पूरा करना चाहते हैं?,你确定要完成对这张照片的处理吗？
+confirm_generation_not_enough,You don't have enough generations. Top up via /buy or reduce the number of requested images.,Недостаточно генераций на балансе. Пополните баланс через /buy или уменьшите количество запрашиваемых фото.,您的余额不足，无法进行更多次的拍摄。请通过 /buy 命令充值，或减少请求的照片数量。,आपके खाते में पर्याप्त संख्या में फ़ोटो नहीं हैं। /buy के माध्यम से अपना खाता भरें या अनुरोधित फ़ोटो की संख्या कम करें।,您的余额不足，无法进行更多次的拍摄。请通过 /buy 数量。
+confirm_generation_ok,Tap “Next” to start generation.,"Нажмите «Далее», чтобы создать фотографии.",点击“下一步”创建照片。,फोटो बनाने के लिए Next पर क्लिक करें।,点击“下一步”创建照片.
 confirm_generation_title,"<b>Pre-generation check</b>
 
 Items: {items}
@@ -121,53 +143,131 @@ You are about to create {photos} image(s).","<b>Проверка перед ге
 Соотношение сторон: {aspect}
 
 Ваш баланс: {balance} генераций.
-Вы создаёте {photos} фото."
+Вы создаёте {photos} фото.","<b>生成前请检查</b>
+
+物品数量：{items}
+
+背景：{background}
+
+性别：{gender}
+
+发型：{hair}
+
+年龄：{age}
+
+风格：{style}
+
+宽高比：{aspect}
+
+您的剩余生成次数：{balance} 次。
+
+您创建了 {photos} 张照片。","जनरेशन से पहले जांच लें
+
+आइटमों की संख्या: {आइटम}
+पृष्ठभूमि: {पृष्ठभूमि}
+लिंग: {लिंग}
+बाल: {बाल}
+आयु: {आयु}
+शैली: {शैली}
+आस्पेक्ट रेशियो: {आस्पेक्ट}
+
+आपका बैलेंस: {बैलेंस} जनरेशन।
+आप {फ़ोटो} फ़ोटो बनाते हैं।","<b>生成前请检查</b>
+
+物品数量:{elementos}
+
+背景: {antecedentes}
+
+性别：{género}
+
+发型: {pelo}
+
+年龄：{edad}
+
+风格：{estilo}
+
+宽高比：{aspecto}
+
+您的剩余生成次数:{saldo} 次.
+
+您创建了 {fotos} 张照片。"
 examples_soon,"Examples section is under development.
 Later you will see real-world samples collected from your generations.","Раздел с примерами пока в разработке.
-Позже здесь появятся реальные кейсы, собранные из ваших генераций."
-gender_choose_title,Choose the model gender:,Выберите пол модели:
-gender_selected_stub,"Model gender has been saved. The next steps will be hair color, age, style and aspect ratio.","Пол модели сохранён. На следующем шаге будет выбор цвета волос, возраста, стиля и соотношения сторон."
+Позже здесь появятся реальные кейсы, собранные из ваших генераций.","示例部分仍在开发中。
+
+稍后将在此处展示来自各位的真实案例。","उदाहरण अनुभाग अभी भी विकास के अधीन है।
+आपकी पीढ़ी से संकलित वास्तविक जीवन के उदाहरण बाद में यहां दिखाई देंगे।","示例部分仍在开发中.
+
+稍后将在此处展示来自各位的真实案例."
+gender_choose_title,Choose the model gender:,Выберите пол модели:,选择模特性别：,मॉडल का लिंग चुनें:,选择模特性别:
+gender_selected_stub,"Model gender has been saved. The next steps will be hair color, age, style and aspect ratio.","Пол модели сохранён. На следующем шаге будет выбор цвета волос, возраста, стиля и соотношения сторон.",模型性别已保存。下一步将选择头发颜色、年龄、发型和宽高比。,"मॉडल का लिंग सेव हो चुका है। अगला चरण बालों का रंग, उम्र, स्टाइल और आस्पेक्ट रेशियो का चयन करना होगा।",、年龄、发型和宽高比。
 generate_intro_short,"To create a try-on shot, you need to upload a clothing photo and set parameters.
 
 Tap “Start” to see photo guidelines and choose the photo type.","Чтобы создать примерочный кадр, нужно загрузить фото вещи и задать параметры.
 
-Нажмите «Начать», чтобы изучить рекомендации к фото и выбрать тип снимка."
+Нажмите «Начать», чтобы изучить рекомендации к фото и выбрать тип снимка.","要创建试穿照片，请上传商品照片并设置参数。
+
+点击“开始”查看照片推荐并选择照片类型。","ट्राई-ऑन फोटो बनाने के लिए, आइटम की फोटो अपलोड करें और पैरामीटर सेट करें।
+
+फोटो के सुझाव देखने और फोटो का प्रकार चुनने के लिए ""स्टार्ट"" पर क्लिक करें।","要创建试穿照片,请上传商品照片并设置参数.
+
+点击“开始”查看照片推荐并选择照片类型."
 generate_stub_registered,"Generation request registered (ID: {gen_id}).
 Prompt builder and Seedream 4.0 invocation will be wired in the next development step.","Запрос на генерацию зарегистрирован (ID: {gen_id}).
-Логика конструктора и вызова Seedream 4.0 будет подключена на следующем этапе разработки."
-generation_done,Done! Here is your generated shot.,Готово! Вот сгенерированный кадр.
-generation_failed,Failed to generate an image. Please try again or contact support.,Не удалось выполнить генерацию. Попробуйте ещё раз или обратитесь в поддержку.
-hair_need_one,Please select at least one hair color to continue.,"Выберите хотя бы один вариант цвета волос, чтобы продолжить."
-hair_selected_header,Selected hair colors:,Выбранные цвета волос:
-help_header,Available commands,Доступные команды
-help_items.buy,Top up balance with Stars,Пополнить баланс звёздами
-help_items.cancel,Cancel current scenario,Отменить текущий сценарий
-help_items.examples,See examples (stub),Посмотреть примеры (заглушка)
-help_items.generate,Generate virtual try-on shot from clothing photo,Сгенерировать примерочный кадр по фото вещи
-help_items.help,Show this help,Показать справку по командам
-help_items.language,Change interface language,Выбрать язык интерфейса
-help_items.profile,Show profile and balance,Показать профиль и баланс
-help_items.start,Reset state and show the welcome message,Сбросить состояние и показать приветственное сообщение
-history_empty,You don't have any completed generations yet.,У вас пока нет завершённых генераций.
+Логика конструктора и вызова Seedream 4.0 будет подключена на следующем этапе разработки.","生成请求已注册（ID：{gen_id}）。
+
+构造函数和 Seedream 4.0 调用逻辑将在下一开发阶段添加。","जनरेशन अनुरोध पंजीकृत हो चुका है (आईडी: {gen_id})।
+कंस्ट्रक्टर और सीड्रीम 4.0 कॉल लॉजिक को विकास के अगले चरण में शामिल किया जाएगा।","生成请求已注册（ID：{gen_id}）。
+
+Semilla 4.0 Semilla 4.0"
+generation_done,Done! Here is your generated shot.,Готово! Вот сгенерированный кадр.,完成！这是生成的帧。,हो गया! यह रहा जनरेट किया गया फ्रेम।,完成！这是生成的帧.
+generation_failed,Failed to generate an image. Please try again or contact support.,Не удалось выполнить генерацию. Попробуйте ещё раз или обратитесь в поддержку.,生成失败。请重试或联系技术支持。,जनरेशन विफल हो गई। कृपया पुनः प्रयास करें या सहायता टीम से संपर्क करें।,生成失败。请重试或联系技术支持。
+hair_need_one,Please select at least one hair color to continue.,"Выберите хотя бы один вариант цвета волос, чтобы продолжить.",请至少选择一种发色选项以继续。,आगे बढ़ने के लिए कृपया कम से कम एक हेयर कलर विकल्प चुनें।,请至少选择一种发色选项以继续.
+hair_selected_header,Selected hair colors:,Выбранные цвета волос:,精选发色：,चयनित बालों के रंग:,精选发色:
+help_header,Available commands,Доступные команды,可用命令,उपलब्ध कमांड,可用命令
+help_items.buy,Top up balance with Stars,Пополнить баланс звёздами,用星星充值您的余额,सितारों से अपना बैलेंस बढ़ाएं,用星星充值您的余额
+help_items.cancel,Cancel current scenario,Отменить текущий сценарий,取消当前场景,वर्तमान परिदृश्य को रद्द करें,取消当前场景
+help_items.examples,See examples (stub),Посмотреть примеры (заглушка),查看示例（存根）,उदाहरण देखें (अधूरा भाग),查看示例（存根）
+help_items.generate,Generate virtual try-on shot from clothing photo,Сгенерировать примерочный кадр по фото вещи,根据物品照片生成合适的相框,वस्तु की तस्वीर से एक उपयुक्त फ्रेम बनाएं,根据物品照片生成合适的相框
+help_items.help,Show this help,Показать справку по командам,显示命令帮助,कमांड सहायता दिखाएँ,显示命令帮助
+help_items.language,Change interface language,Выбрать язык интерфейса,选择界面语言,इंटरफ़ेस भाषा का चयन करें,选择界面语言
+help_items.profile,Show profile and balance,Показать профиль и баланс,显示概况和平衡,प्रोफ़ाइल और बैलेंस दिखाएँ,显示概况和平衡
+help_items.start,Reset state and show the welcome message,Сбросить состояние и показать приветственное сообщение,重置状态并显示欢迎消息,स्थिति रीसेट करें और स्वागत संदेश दिखाएं,重置状态并显示欢迎消息
+history_empty,You don't have any completed generations yet.,У вас пока нет завершённых генераций.,您目前还没有任何已完成的世代。,अभी तक आपकी कोई भी पीढ़ी पूरी नहीं हुई है।,您目前还没有任何已完成的世代.
 history_item,"📅 {datetime}
 💰 Cost: {cost} credits
 📝 Parameters: {params}","📅 {datetime}
 💰 Стоимость: {cost} кредитов
-📝 Параметры: {params}"
-history_month_limit,Showing generations from the last month,Показаны генерации за последний месяц
-history_page,Page {page} of {total},Страница {page} из {total}
-history_title,📜 <b>Generation History</b>,📜 <b>История генераций</b>
-insufficient_balance,Insufficient balance for regeneration. Please top up your balance.,"Недостаточно средств для повторной генерации. Пожалуйста, пополните баланс."
+📝 Параметры: {params}","📅 {datetime}
+
+💰 费用：{cost} 积分
+
+📝 参数：{params}","📅 {datetime}
+💰 लागत: {cost} क्रेडिट
+📝 पैरामीटर: {params}","📅{fechahora}
+
+💰 费用：{coste} 积分
+
+📝参数:{params}"
+history_month_limit,Showing generations from the last month,Показаны генерации за последний месяц,显示了上个月的世代变化情况。,पिछले महीने की पीढ़ियों को दर्शाया गया है,显示了上个月的世代变化情况.
+history_page,Page {page} of {total},Страница {page} из {total},第 {page} 页，共 {total} 页,कुल पृष्ठों में से {पृष्ठ},"第 {página} 页, 共 {total} 页"
+history_title,📜 <b>Generation History</b>,📜 <b>История генераций</b>,📜 <b>世代历史</b>,📜 <b>पीढ़ीगत इतिहास</b>,📜 <b>世代历史</b>
+insufficient_balance,Insufficient balance for regeneration. Please top up your balance.,"Недостаточно средств для повторной генерации. Пожалуйста, пополните баланс.",余额不足，无法充值。请充值。,पुनर्जीवन के लिए अपर्याप्त धनराशि। कृपया अपनी धनराशि बढ़ाएँ।,余额不足，无法充值。请充值。
 invoice_desc,"Pay any amount of Stars. In this demo 1 Star = 1 generation credit.
 After payment your balance will be updated automatically.","Оплатите удобное количество звёзд. В этом демо 1 звезда = 1 кредит генерации.
-После оплаты баланс будет автоматически пополнен."
-invoice_title,Balance top-up (Stars),Пополнение баланса (звёзды)
-kb_examples,📸 Examples,📸 Примеры
-kb_generation,🎨 Generation,🎨 Генерация
-kb_my_account,👤 My Account,👤 Мой аккаунт
-lang_switched,Interface language switched to: {language},Язык интерфейса переключен на: {language}
-moving_to_angles,Moving to new angles and poses selection...,Переход к выбору новых ракурсов и поз...
-moving_to_next_base,Moving to next base photo...,Переход к следующему базовому фото...
+После оплаты баланс будет автоматически пополнен.","付费购买所需数量的星星。在本演示中，1 颗星星 = 1 个世代积分。
+
+付款后，您的余额将自动补充。","अपनी सुविधानुसार सितारों की संख्या के लिए भुगतान करें। इस डेमो में, 1 स्टार = 1 जनरेशन क्रेडिट।
+भुगतान के बाद, आपका बैलेंस अपने आप रीचार्ज हो जाएगा।","付费购买所需数量的星星。在本演示中，1 颗星星 = 1 个世代积分。
+
+付款后,您的余额将自动补充."
+invoice_title,Balance top-up (Stars),Пополнение баланса (звёзды),余额补充（星级）,बैलेंस पुनःपूर्ति (सितारे),余额补充（星级）
+kb_examples,📸 Examples,📸 Примеры,📸 示例,📸 उदाहरण,📸 示例
+kb_generation,🎨 Generation,🎨 Генерация,🎨一代,🎨 पीढ़ी,🎨一代
+kb_my_account,👤 My Account,👤 Мой аккаунт,👤 我的账号,👤 मेरा खाता,👤
+lang_switched,Interface language switched to: {language},Язык интерфейса переключен на: {language},界面语言已切换为：{language},इंटरफ़ेस की भाषा बदलकर यह हो गई है: {language},界面语言已切换为：{idioma}
+moving_to_angles,Moving to new angles and poses selection...,Переход к выбору новых ракурсов и поз...,接下来要选择新的角度和姿势……,अब नए एंगल और पोज चुनने की बारी है...,接下来要选择新的角度和姿势……
+moving_to_next_base,Moving to next base photo...,Переход к следующему базовому фото...,接下来是下一张基地照片……,अब अगले बेस फोटो की ओर बढ़ते हैं...,接下来是下一张基地照fotos……
 multi_items_intro,"You have uploaded {count} items.
 
 Next you will choose background, model gender, age, hair color, photo style and aspect ratio for the images.
@@ -176,34 +276,56 @@ How would you like to proceed?","Вы загрузили {count} вещей.
 
 Далее вы сможете выбрать фон, пол, возраст и цвет волос модели, соотношение сторон и стиль фото на выходе.
 
-Что вам удобнее?"
-multi_items_not_supported,Currently the bot supports generation for a single item only. Multi-item flow is coming soon.,Сейчас бот поддерживает генерацию только по одной вещи за раз. Сценарий для нескольких вещей скоро появится.
-no_credits,You don't have enough credits for generation. Please top up via /buy.,Недостаточно кредитов для генерации. Пополните баланс через /buy.
-no_more_photos,No more photos in queue.,Больше нет фотографий в очереди.
-payment_method_desc,Select your preferred payment method to top up balance:,Выберите удобный для вас способ пополнения баланса:
-payment_method_title,💳 <b>Choose Payment Method</b>,💳 <b>Выберите способ оплаты</b>
+Что вам удобнее?","您已上传 {count} 件商品。
+
+接下来，您可以选择模特的背景、性别、年龄和发色，以及最终照片的宽高比和风格。
+
+哪种方式对您来说更方便？","आपने {count} आइटम अपलोड कर दिए हैं।
+
+इसके बाद, आप मॉडल का बैकग्राउंड, लिंग, उम्र और बालों का रंग, साथ ही अंतिम फ़ोटो का आस्पेक्ट रेशियो और स्टाइल चुन सकेंगे।
+
+आपके लिए क्या ज़्यादा सुविधाजनक है?","您已上传{count}件商品.
+
+接下来,您可以选择模特的背景、性别、年龄和发色.
+
+哪种方式对您来说更方便？"
+multi_items_not_supported,Currently the bot supports generation for a single item only. Multi-item flow is coming soon.,Сейчас бот поддерживает генерацию только по одной вещи за раз. Сценарий для нескольких вещей скоро появится.,目前，该机器人一次仅支持生成一个物品。支持生成多个物品的脚本即将推出。,"फिलहाल, यह बॉट एक बार में केवल एक ही आइटम जनरेट कर सकता है। एक से अधिक आइटम जनरेट करने के लिए स्क्रिप्ट जल्द ही उपलब्ध होगी।",目前，该机器人一次仅支持生成一个物品。支持生成多个物品的脚本即将推出。
+no_credits,You don't have enough credits for generation. Please top up via /buy.,Недостаточно кредитов для генерации. Пополните баланс через /buy.,积分不足，无法生成奖励。请通过 /buy 命令充值。,पर्याप्त क्रेडिट नहीं हैं। /buy के माध्यम से अपना बैलेंस टॉप अप करें।,积分不足，无法生成奖励。请通过 /buy 命令充值。
+no_more_photos,No more photos in queue.,Больше нет фотографий в очереди.,队列中已无照片。,अब कतार में और तस्वीरें नहीं ली जा सकतीं।,队列中已无照片.
+payment_method_desc,Select your preferred payment method to top up balance:,Выберите удобный для вас способ пополнения баланса:,选择一种便捷的充值方式：,अपना बैलेंस टॉप अप करने के लिए एक सुविधाजनक तरीका चुनें:,选择一种便捷的充值方式:
+payment_method_title,💳 <b>Choose Payment Method</b>,💳 <b>Выберите способ оплаты</b>,💳 <b>选择付款方式</b>,💳 <b>भुगतान विधि चुनें</b>,💳 <b>选择付款方式</b>
 payment_ok,"Stars payment succeeded.
 Transaction ID: {charge_id}
 Stars credited: {amount}","Оплата звёздами прошла успешно.
 ID транзакции: {charge_id}
-Начислено звёзд: {amount}"
-payment_stars_desc,Payment via Telegram Stars,Оплата через Telegram Stars
-payment_yookassa_desc,Bank card payment via YooKassa,Оплата банковской картой через YooKassa
-photo_approved,Photo approved!,Фото утверждено!
-photo_rejected,Photo rejected.,Фото отклонено.
-photo_review_question,What would you like to do with this photo?,Что сделать с этим фото?
-photo_review_title,Photo {current} of {total},Фото {current} из {total}
-processing_generation,Processing your image and starting generation…,Обрабатываю изображение и запускаю генерацию…
-profile_line_balance_credits,Credits (generations): {balance},Кредиты (генерации): {balance}
-profile_line_balance_money,Money balance: {balance} ₽,Денежный баланс: {balance} ₽
-profile_line_created,Created at: {created},Создан: {created}
-profile_line_id,ID: {user_id},ID: {user_id}
-profile_line_lang,Current language: {lang},Текущий язык: {lang}
-profile_line_last_seen,Last activity: {last_seen},Последняя активность: {last_seen}
-profile_line_txn,Successful top-ups: {count} for total {sum} {cur},Успешных пополнений: {count} шт. на сумму {sum} {cur}
-profile_line_user,Username: @{username},Username: @{username}
-profile_not_found,Profile is not created yet. Send /start to begin.,"Профиль ещё не создан. Напишите /start, чтобы начать."
-profile_title,Your profile,Ваш профиль
+Начислено звёзд: {amount}","使用星星支付成功。
+
+交易 ID：{charge_id}
+
+获得的星星数量：{amount}","स्टार्स के माध्यम से भुगतान सफल रहा।
+लेनदेन आईडी: {charge_id}
+प्राप्त स्टार्स: {amount}","使用星星支付成功.
+
+交易 ID: {charge_id}
+
+获得的星星数量:{cantidad}"
+payment_stars_desc,Payment via Telegram Stars,Оплата через Telegram Stars,通过 Telegram Stars 付款,टेलीग्राम स्टार्स के माध्यम से भुगतान,通过 Estrellas de Telegram 付款
+payment_yookassa_desc,Bank card payment via YooKassa,Оплата банковской картой через YooKassa,通过 YooKassa 使用银行卡付款,YooKassa के माध्यम से बैंक कार्ड द्वारा भुगतान,通过 YooKassa 使用银行卡付款
+photo_approved,Photo approved!,Фото утверждено!,照片已通过！,फोटो स्वीकृत!,照片已通过！
+photo_rejected,Photo rejected.,Фото отклонено.,照片被拒。,फोटो अस्वीकृत।,照片被拒。
+photo_review_question,What would you like to do with this photo?,Что сделать с этим фото?,这张照片该怎么处理？,इस फोटो का क्या करें?,这张照片该怎么处理？
+photo_review_title,Photo {current} of {total},Фото {current} из {total},照片 {current} 共 {total} 张照片,कुल का वर्तमान फोटो,照片 {actual} 共 {total} 张照片
+processing_generation,Processing your image and starting generation…,Обрабатываю изображение и запускаю генерацию…,我处理图像并开始生成……,मैं छवि को संसाधित करता हूं और जनरेट करना शुरू करता हूं...,我处理图像并开始生成……
+profile_line_balance_credits,Credits (generations): {balance},Кредиты (генерации): {balance},积分（生成）：{余额},क्रेडिट (उत्पादन): {शेष राशि},积分（生成）：{余额}
+profile_line_balance_money,Money balance: {balance} ₽,Денежный баланс: {balance} ₽,现金余额：{balance} ₽,नकद शेष: {शेष} ₽,现金余额：{saldo} ₽
+profile_line_created,Created at: {created},Создан: {created},创建时间：{created},निर्मित: {निर्मित},创建时间:{creado}
+profile_line_id,ID: {user_id},ID: {user_id},ID：{user_id},आईडी: {user_id},Identificación: {user_id}
+profile_line_lang,Current language: {lang},Текущий язык: {lang},当前语言：{lang},वर्तमान भाषा: {lang},当前语言：{lang}
+profile_line_last_seen,Last activity: {last_seen},Последняя активность: {last_seen},最后上线时间：{last_seen},अंतिम बार देखा गया: {last_seen},最后上线时间:{last_seen}
+profile_line_txn,Successful top-ups: {count} for total {sum} {cur},Успешных пополнений: {count} шт. на сумму {sum} {cur},充值成功次数：{count} 次，金额为 {sum} {cur},"सफल टॉप-अप: {count} पीस, {sum} {cur} की राशि के लिए",充值成功次数：{count} 次，金额为 {suma} {cur}
+profile_line_user,Username: @{username},Username: @{username},用户名：@{username},उपयोगकर्ता नाम: @{username},用户名:@{nombre de usuario}
+profile_not_found,Profile is not created yet. Send /start to begin.,"Профиль ещё не создан. Напишите /start, чтобы начать.",您的个人资料尚未创建。输入 /start 开始创建。,आपकी प्रोफ़ाइल अभी तक नहीं बनी है। शुरू करने के लिए /start टाइप करें।,您的个人资料尚未创建。输入 /start 开始创建。
+profile_title,Your profile,Ваш профиль,您的个人资料,आपकी प्रोफ़ाइल,您的个人资料
 prompt_upload_flat,"Please upload a photo of the clothing item on a neutral background.
 It can lie flat or hang on a hanger.
 We recommend cropping the image so that only the clothing you want to put on the model remains.
@@ -212,71 +334,151 @@ Send the image <b>as a document</b> to keep full quality.","Загрузите �
 Одежда может лежать или висеть на вешалке.
 Рекомендуем обрезать фото так, чтобы на нём оставалась только одежда, которую вы хотите надеть на модель.
 
-Отправьте изображение <b>как документ</b>, чтобы сохранить качество."
+Отправьте изображение <b>как документ</b>, чтобы сохранить качество.","请上传一张服装在纯色背景下的照片。
+
+服装可以平铺放置，也可以挂在衣架上。
+
+我们建议您裁剪照片，只保留您希望模特穿着的服装部分。
+
+请将图片<b>以文档形式</b>提交，以保证图片质量。","कपड़ों की एक ऐसी तस्वीर अपलोड करें जिसमें बैकग्राउंड न्यूट्रल हो।
+कपड़े लेटे हुए या हैंगर पर टंगे हो सकते हैं।
+हमारा सुझाव है कि तस्वीर को क्रॉप करके केवल वही कपड़े शामिल करें जिन्हें आप मॉडल को पहनाना चाहते हैं।
+
+गुणवत्ता बनाए रखने के लिए इमेज को <b>डॉक्यूमेंट</b> के रूप में सबमिट करें।","请上传一张服装在纯色背景下的照片.
+
+服装可以平铺放置，也可以挂在衣架上.
+
+我们建议您裁剪照片，只保留您希望模特穿着的服装部分.
+
+请将图片<b>以文档形式</b>提交，以保证图片质量."
 prompt_upload_on_mannequin,"IMPORTANT: the mannequin head must not be visible.
 We recommend cropping the photo so that only the clothing you want to put on the model remains.
 
 Send the image <b>as a document</b> to keep full quality.","ВАЖНО: на фото не должно быть головы манекена.
 Рекомендуем обрезать фотографию так, чтобы на нём оставалась только одежда, которую вы хотите надеть на модель.
 
-Отправьте изображение <b>как документ</b>, чтобы сохранить качество."
+Отправьте изображение <b>как документ</b>, чтобы сохранить качество.","重要提示：照片中不得包含模特的头部。
+
+我们建议您裁剪照片，仅保留您希望模特穿着的服装部分。
+
+请将图片<b>以文档形式</b>提交，以保证图片质量。","महत्वपूर्ण: फोटो में मैनीकिन का सिर नहीं दिखना चाहिए।
+
+हम सुझाव देते हैं कि फोटो को क्रॉप करके केवल वही कपड़े शामिल करें जो आप मॉडल को पहनाना चाहते हैं।
+
+गुणवत्ता बनाए रखने के लिए इमेज को <b>दस्तावेज़</b> के रूप में सबमिट करें।","重要提示：照片中不得包含模特的头部.
+
+我们建议您裁剪照片,仅保留您希望模特穿着的服装部分.
+
+请将图片<b>以文档形式</b>提交，以保证图片质量."
 prompt_upload_on_person,"IMPORTANT: there must be no faces or heads in the image.
 We recommend cropping the photo so that only the clothing you want to put on the model remains.
 
 Send the image <b>as a document</b> to keep full quality.","ВАЖНО: на фото не должно быть лиц и голов людей.
 Рекомендуем обрезать фотографию так, чтобы на нём оставалась только одежда, которую вы хотите надеть на модель.
 
-Отправьте изображение <b>как документ</b>, чтобы сохранить качество."
-rear_view_prompt,Upload a photo of this item from behind,Загрузите фото этой вещи сзади
-redo_question,Would you like to redo the photo?,Хотите переделать фото?
-scenario_back_view,Back view,Ракурс сзади
-scenario_change_angle,Change angle,Смена ракурса
-scenario_change_pose,Change pose,Смена позы
-scenario_full_body,Full body shot,Кадр в полный рост
-scenario_initial_generation,Initial try-on generation,Базовая генерация примерочного кадра
-scenario_lower_body,Lower body shot,Кадр по нижнюю часть тела
-scenario_regenerate_new,Regenerate with new settings,Повторная генерация с новыми настройками
-scenario_regenerate_same,Regenerate with the same settings,Повторная генерация с теми же настройками
-scenario_upper_body,Upper body shot,Кадр по верхнюю часть тела
+Отправьте изображение <b>как документ</b>, чтобы сохранить качество.","重要提示：照片中不应包含人脸或头部。
+
+我们建议您裁剪照片，仅保留您希望模特穿着的服装部分。
+
+请以<b>文档</b>格式提交图片，以保证图片质量。","महत्वपूर्ण: फोटो में लोगों के चेहरे या सिर नहीं होने चाहिए।
+
+हमारा सुझाव है कि फोटो को क्रॉप करके केवल वही कपड़े शामिल करें जो आप मॉडल को पहनाना चाहते हैं।
+
+गुणवत्ता बनाए रखने के लिए इमेज को <b>दस्तावेज़</b> के रूप में सबमिट करें।","重要提示：照片中不应包含人脸或头部.
+
+我们建议您裁剪照片,仅保留您希望模特穿着的服装部分.
+
+请以<b>文档</b>格式提交图片，以保证图片质量."
+rear_view_prompt,Upload a photo of this item from behind,Загрузите фото этой вещи сзади,请上传此物品背面的照片,इस वस्तु के पीछे की तस्वीर अपलोड करें,请上传此物品背面的照fotos
+redo_question,Would you like to redo the photo?,Хотите переделать фото?,想重拍一张照片吗？,क्या आप किसी फोटो को दोबारा बनाना चाहते हैं?,想重拍一张照片吗？
+scenario_back_view,Back view,Ракурс сзади,后视图,पीछे देखना,后视图
+scenario_change_angle,Change angle,Смена ракурса,视角转变,नजरिए में बदलाव,视角转变
+scenario_change_pose,Change pose,Смена позы,姿势变化,मुद्रा में परिवर्तन,姿势变化
+scenario_full_body,Full body shot,Кадр в полный рост,全身镜头,पूर्ण लंबाई वाला शॉट,全身镜头
+scenario_initial_generation,Initial try-on generation,Базовая генерация примерочного кадра,样本帧的基本生成,सैंपल फ्रेम का मूल निर्माण,样本帧的基本生成
+scenario_lower_body,Lower body shot,Кадр по нижнюю часть тела,下半身镜头,शरीर के निचले हिस्से का शॉट,下半身镜头
+scenario_regenerate_new,Regenerate with new settings,Повторная генерация с новыми настройками,使用新设置进行再生,नई सेटिंग्स के साथ पुनर्जनन,使用新设置进行再生
+scenario_regenerate_same,Regenerate with the same settings,Повторная генерация с теми же настройками,使用相同的设置重新生成,समान सेटिंग्स के साथ पुनर्जनन,使用相同的设置重新生成
+scenario_upper_body,Upper body shot,Кадр по верхнюю часть тела,上半身镜头,ऊपरी शरीर का शॉट,上半身镜头
 send_photo_prompt,"Please send a photo of the clothing item.
 
 It can be worn on a person, on a mannequin, or on a hanger, as long as the item is clearly visible.","Отправьте, пожалуйста, фото вещи.
 
-Подходит: одежда на человеке, манекене или вешалке, главное — чтобы сама вещь была хорошо видна."
-settings_age_title,Choose model age:,Выберите возраст модели:
+Подходит: одежда на человеке, манекене или вешалке, главное — чтобы сама вещь была хорошо видна.","请发送商品照片。
+
+要求：商品应展示在真人、模特或衣架上；最重要的是，商品本身要清晰可见。","कृपया वस्तु की एक तस्वीर भेजें।
+
+उपयुक्त: वस्तु किसी व्यक्ति, पुतले या हैंगर पर होनी चाहिए; मुख्य बात यह है कि वस्तु स्पष्ट रूप से दिखाई दे।","请发送商品照fotos.
+
+要求：商品应展示在真人、模特或衣架上；最重要的是，商品本身要清晰可见."
+settings_age_title,Choose model age:,Выберите возраст модели:,选择模特年龄：,मॉडल की आयु चुनें:,选择模特年龄:
 settings_aspect_title,"Select one or more aspect ratios.
 
 All images are generated in 4K resolution. Multiple aspect ratios increase the number of images.","Выберите одно или несколько соотношений сторон кадра.
 
-Все фото создаются в разрешении 4K. Несколько соотношений сторон увеличивают количество фото."
+Все фото создаются в разрешении 4K. Несколько соотношений сторон увеличивают количество фото.","选择一种或多种宽高比。
+
+所有照片均以 4K 分辨率拍摄。多种宽高比可增加您可拍摄的照片数量。","एक या अधिक आस्पेक्ट रेशियो चुनें।
+
+सभी फ़ोटो 4K रिज़ॉल्यूशन में खींची जाती हैं। कई आस्पेक्ट रेशियो चुनने से आप ज़्यादा फ़ोटो खींच सकते हैं।","选择一种或多种宽高比.
+
+所有照片均以 4K |"
 settings_background_title,"Choose background color for your try-on photo.
 
 Background affects the final look of the image.","Выберите цвет фона для создания фото вашей вещи на модели.
 
-Важно: выбор фона влияет на итоговый вид фото."
-settings_gender_title,Choose model gender:,Выберите пол модели:
+Важно: выбор фона влияет на итоговый вид фото.","请为您的商品模特照片选择背景颜色。
+
+重要提示：您选择的背景颜色会影响照片的最终效果。","मॉडल पर अपने उत्पाद की तस्वीर के लिए पृष्ठभूमि का रंग चुनें।
+
+महत्वपूर्ण: आपके द्वारा चुना गया पृष्ठभूमि रंग तस्वीर के अंतिम स्वरूप को प्रभावित करेगा।","请为您的商品模特照片选择背景颜色.
+
+重要提示：您选择的背景颜色会影响照片的最终效果."
+settings_gender_title,Choose model gender:,Выберите пол модели:,选择模特性别：,मॉडल का लिंग चुनें:,选择模特性别:
 settings_hair_title,"Select one or more hair colors for the model.
 
 IMPORTANT: choosing multiple options here and in other steps (background, style, aspect ratio) multiplies the number of images.
 Option “Any” does not increase the image count and does not add a hair-color constraint to the prompt.","Выберите один или несколько цветов волос модели.
 
 ВАЖНО: выбор нескольких вариантов в этом и других пунктах (фон, стиль, соотношение сторон) перемножает количество создаваемых фото.
-Вариант «Любой» не увеличивает количество фото и не добавляет уточнение по цвету волос в промпт."
-settings_intro_single,"You have uploaded {count} item. Next you will select background, model gender, age and hair color, aspect ratio and photo style.","Вы загрузили {count} вещь. Далее вы сможете выбрать фон, пол, возраст и цвет волос модели, соотношение сторон и стиль фото на выходе."
+Вариант «Любой» не увеличивает количество фото и не добавляет уточнение по цвету волос в промпт.","请为模特选择一种或多种发色。
+
+重要提示：在此项及其他部分（背景、样式、宽高比）选择多个选项会增加生成的照片数量。
+
+“任意”选项不会增加照片数量，也不会在提示中添加发色选项。","मॉडल के लिए एक या अधिक बालों के रंग चुनें।
+
+महत्वपूर्ण: इस और अन्य अनुभागों (पृष्ठभूमि, शैली, आस्पेक्ट रेशियो) में एक से अधिक विकल्प चुनने से बनाई गई तस्वीरों की संख्या कई गुना बढ़ जाती है।
+""कोई भी"" विकल्प चुनने से तस्वीरों की संख्या नहीं बढ़ती है और न ही प्रॉम्प्ट में बालों के रंग का विकल्प जुड़ता है।","请为模特选择一种或多种发色.
+
+重要提示：在此项及其他部分（背景、样式、宽高比）选择多个选项会增加生成的照片数量.
+
+“任意”选项不会增加照片数量,也不会在提示中添加发色选项."
+settings_intro_single,"You have uploaded {count} item. Next you will select background, model gender, age and hair color, aspect ratio and photo style.","Вы загрузили {count} вещь. Далее вы сможете выбрать фон, пол, возраст и цвет волос модели, соотношение сторон и стиль фото на выходе.",您已上传 {count} 件商品。接下来，您可以选择模特的背景、性别、年龄和发色，以及最终照片的宽高比和风格。,"आपने {count} आइटम अपलोड कर दिए हैं। अब आप मॉडल का बैकग्राउंड, लिंग, उम्र और बालों का रंग, साथ ही अंतिम फ़ोटो का आस्पेक्ट रेशियो और स्टाइल चुन सकेंगे।",您已上传{count}件商品。接下来，您可以选择模特的背景、性别、年龄和发色，以及最终照片的宽高比和风格。
 settings_style_title,"Select one or more output photo styles.
 
 The style affects how the model and clothing will look. Multiple styles increase the number of generated images.","Выберите один или несколько стилей фото на выходе.
 
-Стиль влияет на то, как нейросеть обработает одежду и модель. Несколько стилей увеличивают количество создаваемых фото."
-start_title,Welcome to AI models Bot! Here you can instantly turn a photo of clothes into a ready - to - sell catalog of professional photographs of beautiful models of any gender and age in 4K resolution.,Добро пожаловать в AI models Bot! Здесь вы можете моментально превратить фото одежды в готовый ĸ продаже ĸаталог профессиональных снимĸов на ĸрасивых моделях любых полов и возрастов в разрешении 4K.
-style_need_one,Please select at least one style to continue.,"Выберите хотя бы один стиль, чтобы продолжить."
-style_selected_header,Selected styles:,Выбранные стили:
+Стиль влияет на то, как нейросеть обработает одежду и модель. Несколько стилей увеличивают количество создаваемых фото.","选择一种或多种输出照片风格。
+
+风格会影响神经网络处理服装和模特的方式。多种风格可以增加生成的照片数量。","एक या अधिक आउटपुट फोटो स्टाइल चुनें।
+
+स्टाइल यह निर्धारित करता है कि न्यूरल नेटवर्क कपड़ों और मॉडल को कैसे प्रोसेस करेगा। एक से अधिक स्टाइल चुनने से उत्पन्न होने वाली तस्वीरों की संख्या बढ़ जाती है।","选择一种或多种输出照片风格.
+
+神经网络处理服装和模特的方式。多种风格可以增加生成的照片数量。"
+start_title,Welcome to AI models Bot! Here you can instantly turn a photo of clothes into a ready - to - sell catalog of professional photographs of beautiful models of any gender and age in 4K resolution.,Добро пожаловать в AI models Bot! Здесь вы можете моментально превратить фото одежды в готовый ĸ продаже ĸаталог профессиональных снимĸов на ĸрасивых моделях любых полов и возрастов в разрешении 4K.,欢迎使用 AI 模型机器人！在这里，您可以立即将服装照片转换为可立即销售的专业照片目录，其中包含各种性别和年龄段的美丽模特，分辨率为 4K。,"एआई मॉडल्स बॉट में आपका स्वागत है! यहां आप कपड़ों की तस्वीरों को झटपट एक तैयार कैटलॉग में बदल सकते हैं, जिसमें सभी लिंगों और उम्र के खूबसूरत मॉडलों की 4K रेज़ोल्यूशन वाली पेशेवर तस्वीरें होंगी।",Inicio AI: 4K.
+style_need_one,Please select at least one style to continue.,"Выберите хотя бы один стиль, чтобы продолжить.",请至少选择一种样式继续。,कृपया जारी रखने के लिए कम से कम एक शैली का चयन करें।,请至少选择一种样式继续.
+style_selected_header,Selected styles:,Выбранные стили:,精选款式：,चयनित शैलियाँ:,精选款式：
 task_queued,"Your request has been queued (ID: {task_id}).
 The model is processing it now.","Задача поставлена в очередь (ID: {task_id}).
-Идёт обработка на сервере нейросети."
-unknown_lang,Unknown language. Please try again.,Неизвестный язык. Попробуйте ещё раз.
-upload_doc_only,Please send the photo as a document in original quality (without compression).,"Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия)."
-upload_doc_wrong_type,This does not look like an image. Please send the clothing photo as a document (file).,"Это не похоже на изображение. Пожалуйста, отправьте фотографию одежды как документ (файл)."
+Идёт обработка на сервере нейросети.","任务已加入队列（ID：{task_id}）。
+
+神经网络服务器正在处理该任务。","कार्य को कतार में डाल दिया गया है (आईडी: {task_id})।
+न्यूरल नेटवर्क सर्वर पर प्रोसेसिंग जारी है।","任务已加入队列（ID：{task_id}）。
+
+神经网络服务器正在处理该任务."
+unknown_lang,Unknown language. Please try again.,Неизвестный язык. Попробуйте ещё раз.,语言未知。请重试。,यह भाषा अज्ञात है। कृपया पुनः प्रयास करें।,语言未知。请重试。
+upload_doc_only,Please send the photo as a document in original quality (without compression).,"Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия).",请以原始质量（未压缩）的文档形式发送照片。,कृपया फोटो को मूल गुणवत्ता (बिना संपीड़ित किए) में दस्तावेज़ के रूप में भेजें।,请以原始质量（未压缩）的文档形式发送照片.
+upload_doc_wrong_type,This does not look like an image. Please send the clothing photo as a document (file).,"Это не похоже на изображение. Пожалуйста, отправьте фотографию одежды как документ (файл).",这件衣服看起来和图片不符。请将衣服的照片以文档（文件）的形式发送给我。,यह तस्वीर से मेल नहीं खाता। कृपया कपड़े की एक तस्वीर दस्तावेज़ (फ़ाइल) के रूप में भेजें।,这件衣服看起来和图片不符。请将衣服的照片以文档（文件）的形式发送给我。
 upload_intro_full,"<b>Upload photos of the items you want to put on the model.</b>
 
 Step 1. Read the guidelines:
@@ -307,13 +509,86 @@ Important: each uploaded photo counts as a separate item.","<b>Загрузит�
 - Фото на манекене (без головы манекена)
 
 Шаг 3. Загрузите фотографию одной или нескольких вещей.
-Важно: каждое загруженное фото считается отдельной вещью."
-variant_result,Generation result:,Результат генерации:
+Важно: каждое загруженное фото считается отдельной вещью.","<b>上传您希望模特穿着的服装照片。</b>
+
+步骤 1. 请遵循以下准则：
+
+- 裁剪照片：尽量只保留所需服装，避免多余部分。
+
+- 照片中不应包含人脸、头部或人体模型。
+
+- 照片分辨率越高，效果越好。
+
+- 复杂的金属配件可能无法正确显示。
+
+- 展示带有拉链的服装可能需要多次尝试。
+
+步骤 2. 选择您要上传的照片类型：
+
+- 服装照片（平铺或挂在衣架上）
+
+- 人物照片（不含人脸或其他不必要元素）
+
+- 人体模型照片（不含人体模型头部）
+
+步骤 3. 上传一张或多件服装的照片。
+
+重要提示：每张上传的照片都被视为一件单独的服装。","<b>मॉडल को जो आइटम पहनाना चाहते हैं, उनकी तस्वीरें अपलोड करें।</b>
+
+चरण 1. इन निर्देशों का पालन करें:
+- फोटो को क्रॉप करें: वांछित कपड़ों के अलावा जितना हो सके कम अतिरिक्त भाग रखें।
+
+- तस्वीरों में चेहरे, सिर या मैनीकिन नहीं होने चाहिए।
+
+- फोटो का रिज़ॉल्यूशन जितना अधिक होगा, परिणाम उतना ही बेहतर होगा।
+
+- जटिल धातु के हार्डवेयर सही ढंग से प्रदर्शित नहीं हो सकते हैं।
+
+- ज़िपर वाले कपड़ों को प्रदर्शित करने के लिए अधिक प्रयास करने पड़ सकते हैं।
+
+चरण 2. अपलोड की जाने वाली फोटो का प्रकार चुनें:
+- कपड़ों की फोटो (लेटे हुए या हैंगर पर लटके हुए)
+- किसी व्यक्ति की फोटो (चेहरे या अनावश्यक तत्वों के बिना)
+- मैनीकिन की फोटो (मैनीकिन के सिर के बिना)
+
+चरण 3. एक या अधिक आइटम की फोटो अपलोड करें।
+
+महत्वपूर्ण: अपलोड की गई प्रत्येक फोटो को एक अलग आइटम माना जाएगा।","<b>上传您希望模特穿着的服装照片。</b>
+
+步骤 1. 请遵循以下准则：
+
+- 裁剪照片：尽量只保留所需服装，避免多余部分。
+
+- 照片中不应包含人脸、头部或人体模型.
+
+- 照片分辨率越高,效果越好.
+
+- 复杂的金属配件可能无法正确显示.
+
+- 展示带有拉链的服装可能需要多次尝试.
+
+Capítulo 2. 选择您要上传的照片类型:
+
+- 服装照片（平铺或挂在衣架上）
+
+- 人物照片（不含人脸或其他不必要元素）
+
+- 人体模型照片（不含人体模型头部）
+
+步骤 3. 上传一张或多件服装的照片.
+
+重要提示：每张上传的照片都被视为一件单独的服装."
+variant_result,Generation result:,Результат генерации:,生成结果：,उत्पादन परिणाम:,生成结果:
 yookassa_check_error,"❌ Error checking payment status.
 Please try again later.","❌ Ошибка при проверке платежа.
-Попробуйте позже."
-yookassa_checking,Checking payment status...,Проверяем статус платежа...
-yookassa_not_configured,❌ YooKassa payment is temporarily unavailable,❌ Оплата через YooKassa временно недоступна
+Попробуйте позже.","❌ 付款验证出错。
+
+请稍后再试。","❌ भुगतान सत्यापित करने में त्रुटि।
+कृपया बाद में पुनः प्रयास करें।","❌ 付款验证出错.
+
+请稍后再试."
+yookassa_checking,Checking payment status...,Проверяем статус платежа...,正在查询付款状态……,भुगतान की स्थिति की जाँच की जा रही है...,正在查询付款状态……
+yookassa_not_configured,❌ YooKassa payment is temporarily unavailable,❌ Оплата через YooKassa временно недоступна,❌ YooKassa支付功能暂时无法使用。,❌ YooKassa के माध्यम से भुगतान फिलहाल अनुपलब्ध है।,❌ YooKassa支付功能暂时无法使用.
 yookassa_payment_created,"🧾 <b>Payment Created!</b>
 
 💰 Amount: {amount} {currency}
@@ -326,12 +601,39 @@ Click the button below to proceed with payment.","🧾 <b>Платеж созд�
 📝 Описание: {description}
 🆔 ID платежа: <code>{payment_id}</code>
 
-Нажмите кнопку ниже для перехода к оплате."
+Нажмите кнопку ниже для перехода к оплате.","🧾 <b>付款已创建！</b>
+
+💰 金额：{amount} {currency}
+
+📝 描述：{description}
+
+🆔 付款 ID：<code>{payment_id}</code>
+
+点击下方按钮继续付款。","🧾 <b>भुगतान हो गया!</b>
+
+💰 राशि: {राशि} {मुद्रा}
+📝 विवरण: {विवरण}
+🆔 भुगतान आईडी: <code>{payment_id}</code>
+
+भुगतान करने के लिए नीचे दिए गए बटन पर क्लिक करें।","🧾 <b>付款已创建！</b>
+
+💰 金额：{cantidad} {moneda}
+
+📝描述:{descripción}
+
+🆔 付款 ID:<code>{paid_id}</code>
+
+点击下方按钮继续付款."
 yookassa_payment_error,"❌ Error creating payment.
 Please try again later.","❌ Ошибка при создании платежа.
-Попробуйте позже."
-yookassa_status_canceled,❌ Payment canceled,❌ Платеж отменен
-yookassa_status_pending,⏳ Payment pending,⏳ Платеж ожидает оплаты
+Попробуйте позже.","❌ 创建付款时出错。
+
+请稍后重试。","❌ भुगतान करने में त्रुटि हुई।
+कृपया बाद में पुनः प्रयास करें।","❌ 创建付款时出错。
+
+请稍后重试."
+yookassa_status_canceled,❌ Payment canceled,❌ Платеж отменен,❌ 付款已取消,❌ भुगतान रद्द कर दिया गया,❌ 付款已取消
+yookassa_status_pending,⏳ Payment pending,⏳ Платеж ожидает оплаты,⏳ 款项待付,⏳ भुगतान की प्रतीक्षा है,⏳ 款项待付
 yookassa_status_succeeded,"✅ <b>Payment Successful!</b>
 
 💰 Amount: {amount} {currency}
@@ -342,7 +644,23 @@ Thank you! Your balance has been updated.","✅ <b>Платеж успешно �
 💰 Сумма: {amount} {currency}
 🆔 ID платежа: <code>{payment_id}</code>
 
-Спасибо за оплату! Баланс обновлен."
-yookassa_status_waiting,⏳ Payment awaiting confirmation,⏳ Платеж ожидает подтверждения
-select_tariff,💳 Choose your desired tariff plan.,💳 Выберите желаемый тарифный план.
-select_payment_method,💳 Select your preferred payment method.,💳 Выберите удобный для вас способ оплаты.
+Спасибо за оплату! Баланс обновлен.","✅ <b>付款已成功完成！</b>
+
+💰 金额：{amount} {currency}
+
+🆔 付款 ID：<code>{payment_id}</code>
+
+感谢您的付款！您的余额已更新。","✅ <b>भुगतान सफलतापूर्वक पूरा हो गया!</b>
+
+💰 राशि: {amount} {currency}
+🆔 भुगतान आईडी: <code>{payment_id}</code>
+
+आपके भुगतान के लिए धन्यवाद! आपका बैलेंस अपडेट कर दिया गया है।","✅ <b>付款已成功完成！</b>
+
+💰 金额：{cantidad} {moneda}
+
+🆔 付款 ID:<code>{paid_id}</code>
+
+感谢您的付款！您的余额已更新."
+yookassa_status_waiting,⏳ Payment awaiting confirmation,⏳ Платеж ожидает подтверждения,⏳ 付款待确认,⏳ भुगतान की पुष्टि प्रतीक्षित है,⏳ 付款待确认
+select_tariff,💳 Choose your desired tariff plan.,💳 Выберите желаемый тарифный план.,💳 选择所需的资费套餐。,💳 अपनी पसंद का टैरिफ प्लान चुनें।,💳 选择所需的资费套餐.

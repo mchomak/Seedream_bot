@@ -44,7 +44,7 @@ import asyncio
 import json
 from io import BytesIO
 # Import helper functions from modular structure
-from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands, reload_translations, I18N_PATH
+from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands, reload_translations, I18N_PATH, get_i18n
 from handlers_func.db_helpers import (
     Profile,
     get_profile,
@@ -225,7 +225,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     def _text_variants(key: str) -> list[str]:
         # Собираем значения по всем языкам, фильтруем пропуски/фолбэки
         vals = []
-        for lg in i18n.available_languages():
+        for lg in get_i18n().available_languages():
             txt = T(lg, key)
             if txt and txt != key:   # если ключа нет, T вернёт сам key
                 vals.append(txt)
@@ -249,6 +249,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 is_premium=getattr(m.from_user, "is_premium", False),
                 is_bot=m.from_user.is_bot,
             )
+        logger.info(f"User started bot {m.from_user.id}")
         lang = await get_lang(m, db)
         await state.clear()  # Clear any existing state
         await m.answer(
@@ -262,7 +263,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         lang = await get_lang(m, db)
 
         # Берём все help_items.* для текущего языка с fallback-цепочкой
-        items = i18n.group("help_items", lang=lang)  # {"start": "...", "help": "...", ...}
+        items = get_i18n().group("help_items", lang=lang)  # {"start": "...", "help": "...", ...}
 
         lines = [f"<b>{T(lang, 'help_header')}</b>"]
         for cmd, desc in sorted(items.items()):
@@ -286,18 +287,39 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     async def _show_tariff_selection(message: Message, lang: str, edit: bool = False):
         """Show tariff package selection with prices filtered by user groups."""
         user_id = message.from_user.id if message.from_user else None
+        logger.info(f"[A/B] Showing tariff selection to user_id={user_id}")
 
         async with db.session() as s:
             # Get user's groups for A/B testing
             user_groups = None
+            logger.info(f"[A/B] Starting tariff selection for user_id={user_id}")
             if user_id:
                 user = (await s.execute(
                     select(User).where(User.user_id == user_id)
                 )).scalar_one_or_none()
+                logger.info(f"[A/B] User found: {user is not None}")
                 if user:
-                    user_groups = user.user_groups
-                    logger.info(f"[A/B] User {user_id} raw user_groups: {repr(user_groups)}, type: {type(user_groups)}")
+                    raw_groups = user.user_groups
+                    logger.info(f"[A/B] User {user_id} raw user_groups: {repr(raw_groups)}, type: {type(raw_groups)}")
 
+                    # Handle various storage formats
+                    if raw_groups:
+                        if isinstance(raw_groups, list):
+                            user_groups = raw_groups
+                        elif isinstance(raw_groups, str):
+                            # Parse string representation of list
+                            import json
+                            try:
+                                user_groups = json.loads(raw_groups)
+                                logger.info(f"[A/B] Parsed user_groups from string: {user_groups}")
+                            except (json.JSONDecodeError, TypeError):
+                                user_groups = [raw_groups]
+                else:
+                    logger.warning(f"[A/B] User {user_id} NOT found in database!")
+            else:
+                logger.warning("[A/B] No user_id available")
+
+            logger.info(f"[A/B] Final user_groups to pass: {user_groups}")
             tariffs = await get_active_tariffs(s, user_groups)
             logger.debug(f"Filtered tariffs for user {user_id}: {[(t.name, t.ab_test_group) for t in tariffs]}")
             single_price = await get_single_credit_price_rub(s)
@@ -1158,9 +1180,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             return
 
         new_lang = parts[1]
-        if new_lang not in i18n.available_languages():
+        if new_lang not in get_i18n().available_languages():
             lang = await get_lang(q, db)
-            await q.answer(i18n.t("unknown_lang", lang=lang), show_alert=True)
+            await q.answer(T(lang, "unknown_lang"), show_alert=True)
             return
 
         # Persist language
@@ -1181,7 +1203,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         # Edit original message with confirmation
         try:
             await q.message.edit_text(
-                i18n.t("lang_switched", lang=new_lang, language=_lang_display_name(new_lang))
+                T(new_lang, "lang_switched", language=_lang_display_name(new_lang))
             )
         except Exception:
             pass
@@ -1189,12 +1211,12 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         # Update persistent keyboard with translated buttons
         await bot.send_message(
             chat_id=q.message.chat.id,
-            text=i18n.t("start_title", lang=new_lang),
+            text=T(new_lang, "start_title"),
             reply_markup=build_main_keyboard(new_lang),
         )
 
         # Update bot commands for this user's chat
-        items = i18n.group("help_items", lang=new_lang)
+        items = get_i18n().group("help_items", lang=new_lang)
         cmds = [
             BotCommand(command="start", description=items.get("start", "Start")),
             BotCommand(command="help", description=items.get("help", "Help")),
