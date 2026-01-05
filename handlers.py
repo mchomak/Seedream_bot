@@ -44,7 +44,7 @@ import asyncio
 import json
 from io import BytesIO
 # Import helper functions from modular structure
-from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands
+from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands, reload_translations, I18N_PATH
 from handlers_func.db_helpers import (
     Profile,
     get_profile,
@@ -204,7 +204,7 @@ class StarsPay:
 
 
 # ---------- core router ----------
-def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Router:
+def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, settings=None) -> Router:
     """
     Primary router:
     - базовые команды: start/help/profile
@@ -4839,7 +4839,141 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
     @r.message(F.successful_payment)
     async def on_success_payment(m: Message, state: FSMContext):
         await pay.on_successful_payment(m, state)
-    
+
+    # --- Admin: upload translations ---
+    @r.message(Command("upload_translations"))
+    async def cmd_upload_translations(m: Message, state: FSMContext):
+        """Admin command to upload new translations CSV file."""
+        admin_ids = settings.telegram_admin_ids if settings else ()
+        if m.from_user.id not in admin_ids:
+            await m.answer("⛔ Access denied. This command is for admins only.")
+            return
+
+        await state.set_state(AdminFlow.waiting_translations_file)
+        await m.answer(
+            "📤 <b>Upload translations file</b>\n\n"
+            "Please send a CSV file with translations.\n"
+            "Required columns: <code>key</code>, <code>en</code>, <code>ru</code>\n\n"
+            "The file will be validated and saved as <code>phrases.csv</code>.\n"
+            "Send /cancel to abort."
+        )
+
+    @r.message(AdminFlow.waiting_translations_file, F.document)
+    async def on_translations_file(m: Message, state: FSMContext, bot: Bot):
+        """Handle uploaded translations CSV file."""
+        import csv
+        import os
+        import shutil
+
+        admin_ids = settings.telegram_admin_ids if settings else ()
+        if m.from_user.id not in admin_ids:
+            await state.clear()
+            await m.answer("⛔ Access denied.")
+            return
+
+        doc = m.document
+        if not doc.file_name or not doc.file_name.endswith(".csv"):
+            await m.answer("❌ Please send a CSV file (must have .csv extension).")
+            return
+
+        # Download file
+        try:
+            file = await bot.get_file(doc.file_id)
+            file_bytes = await bot.download_file(file.file_path)
+            content = file_bytes.read().decode("utf-8")
+        except Exception as e:
+            logger.error(f"Failed to download translations file: {e}")
+            await m.answer("❌ Failed to download file. Please try again.")
+            return
+
+        # Validate CSV structure
+        try:
+            reader = csv.DictReader(content.splitlines())
+            fieldnames = reader.fieldnames or []
+
+            # Check required columns
+            required = {"key", "en", "ru"}
+            missing = required - set(fieldnames)
+            if missing:
+                await m.answer(
+                    f"❌ Missing required columns: <code>{', '.join(missing)}</code>\n\n"
+                    f"Found columns: <code>{', '.join(fieldnames)}</code>"
+                )
+                return
+
+            # Count rows to verify file is not empty
+            rows = list(reader)
+            if not rows:
+                await m.answer("❌ CSV file is empty (no data rows).")
+                return
+
+            row_count = len(rows)
+
+        except csv.Error as e:
+            await m.answer(f"❌ Invalid CSV format: {e}")
+            return
+        except Exception as e:
+            logger.error(f"Error parsing CSV: {e}")
+            await m.answer("❌ Failed to parse CSV file.")
+            return
+
+        # Backup old file and save new one
+        try:
+            target_path = I18N_PATH  # "locales/phrases.csv"
+            backup_path = target_path + ".backup"
+
+            # Create backup if file exists
+            if os.path.exists(target_path):
+                shutil.copy2(target_path, backup_path)
+                logger.info(f"Backed up old translations to {backup_path}")
+
+            # Write new file
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            logger.info(f"Saved new translations to {target_path}")
+
+        except Exception as e:
+            logger.error(f"Failed to save translations file: {e}")
+            await m.answer("❌ Failed to save file. Please try again.")
+            return
+
+        # Reload translations
+        if reload_translations():
+            await state.clear()
+            await m.answer(
+                f"✅ <b>Translations updated successfully!</b>\n\n"
+                f"📊 Loaded {row_count} translation keys\n"
+                f"🌍 Languages: <code>{', '.join(fieldnames)}</code>\n\n"
+                "Translations are now active without restart."
+            )
+        else:
+            # Restore backup on failure
+            try:
+                if os.path.exists(backup_path):
+                    shutil.copy2(backup_path, target_path)
+                    reload_translations()
+            except Exception:
+                pass
+
+            await m.answer(
+                "⚠️ File saved but failed to reload translations.\n"
+                "Previous translations have been restored.\n"
+                "Please check the file format."
+            )
+
+        await state.clear()
+
+    @r.message(AdminFlow.waiting_translations_file)
+    async def on_translations_file_invalid(m: Message, state: FSMContext):
+        """Handle non-document message in translation upload state."""
+        if m.text and m.text.startswith("/cancel"):
+            await state.clear()
+            await m.answer("❌ Upload cancelled.")
+            return
+
+        await m.answer("📎 Please send a CSV file or /cancel to abort.")
+
     # --- debug: логируем тип каждого входящего сообщения ---
     @r.message()
     async def debug_message_types(m: Message):
