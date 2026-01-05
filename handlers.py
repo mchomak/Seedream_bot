@@ -249,7 +249,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 is_premium=getattr(m.from_user, "is_premium", False),
                 is_bot=m.from_user.is_bot,
             )
-        logger.info(f"User started bot {m.from_user.id}")
         lang = await get_lang(m, db)
         await state.clear()  # Clear any existing state
         await m.answer(
@@ -284,10 +283,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         )
         await message.answer(T(lang, "account_menu"), reply_markup=kb)
 
-    async def _show_tariff_selection(message: Message, lang: str, edit: bool = False):
+    async def _show_tariff_selection(message: Message, lang: str, edit: bool = False, tg_user_id: int = None):
         """Show tariff package selection with prices filtered by user groups."""
-        user_id = message.from_user.id if message.from_user else None
-        logger.info(f"[A/B] Showing tariff selection to user_id={user_id}")
+        # Use explicit tg_user_id if provided, otherwise try to get from message
+        user_id = tg_user_id or (message.from_user.id if message.from_user else None)
 
         async with db.session() as s:
             # Get user's groups for A/B testing
@@ -490,7 +489,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     async def on_account_topup(q: CallbackQuery, state: FSMContext):
         """Handle top-up request - show tariff selection."""
         lang = await get_lang(q, db)
-        await _show_tariff_selection(q.message, lang, edit=True)
+        # Pass the actual user ID from callback query, not from message (which is bot's message)
+        await _show_tariff_selection(q.message, lang, edit=True, tg_user_id=q.from_user.id)
         await q.answer()
 
     @r.callback_query(F.data.startswith("tariff:"))
