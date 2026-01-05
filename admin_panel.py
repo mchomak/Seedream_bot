@@ -26,7 +26,8 @@ from aiogram.client.default import DefaultBotProperties
 
 from sqlalchemy import select, func, and_, or_, desc, case, extract
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import flag_modified
+from sqlalchemy.orm.attributes import flag_modified
+
 
 from db import (
     Database,
