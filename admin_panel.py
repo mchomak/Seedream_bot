@@ -578,9 +578,11 @@ async def users_list(
 
         # Search filter
         if search:
+            # Strip @ prefix if present for username search
+            search_clean = search.lstrip("@")
             search_filter = or_(
-                User.user_id == int(search) if search.isdigit() else False,
-                User.tg_username.ilike(f"%{search}%"),
+                User.user_id == int(search_clean) if search_clean.isdigit() else False,
+                User.tg_username.ilike(f"%{search_clean}%"),
             )
             query = query.where(search_filter)
 
@@ -2280,13 +2282,14 @@ async def create_backup(
                 parsed = urllib.parse.urlparse(db_url.replace("postgresql+asyncpg://", "postgresql://"))
 
                 env = os.environ.copy()
-                env["PGPASSWORD"] = parsed.password or ""
+                # URL-decode password (handles special characters like @, :, etc.)
+                env["PGPASSWORD"] = urllib.parse.unquote(parsed.password) if parsed.password else ""
 
                 cmd = [
                     pg_dump_path,
                     "-h", parsed.hostname or "localhost",
                     "-p", str(parsed.port or 5432),
-                    "-U", parsed.username or "postgres",
+                    "-U", urllib.parse.unquote(parsed.username) if parsed.username else "postgres",
                     "-d", parsed.path.lstrip("/"),
                     "-f", filepath,
                 ]
