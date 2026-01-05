@@ -100,7 +100,14 @@
                             <td><input type="number" class="form-control form-control-sm" name="credits" value="{{ package.credits }}" style="width: 80px;"></td>
                             <td><input type="number" step="0.01" class="form-control form-control-sm" name="price" value="{{ package.price }}" style="width: 100px;"></td>
                             <td>{{ package.discount_percent or '-' }}%</td>
-                            <td>{{ package.ab_test_group or 'All' }}</td>
+                            <td>
+                                <select class="form-select form-select-sm" name="ab_test_group" style="width: 120px;">
+                                    <option value="" {% if not package.ab_test_group %}selected{% endif %}>All Users</option>
+                                    {% for group in available_groups %}
+                                    <option value="{{ group }}" {% if package.ab_test_group == group %}selected{% endif %}>{{ group }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
                             <td>
                                 <div class="form-check">
                                     <input type="checkbox" class="form-check-input" name="is_active" {% if package.is_active %}checked{% endif %}>
@@ -138,12 +145,21 @@
                 <input type="number" class="form-control" name="discount_percent" placeholder="Discount %">
             </div>
             <div class="col-md-2">
-                <input type="text" class="form-control" name="ab_test_group" placeholder="A/B Group">
+                <select class="form-select" name="ab_test_group">
+                    <option value="">All Users</option>
+                    {% for group in available_groups %}
+                    <option value="{{ group }}">{{ group }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="col-md-2">
                 <button type="submit" class="btn btn-success w-100"><i class="fas fa-plus"></i> Add</button>
             </div>
         </form>
+        <small class="text-muted mt-2 d-block">
+            <i class="fas fa-info-circle"></i> Groups are created by assigning them to users in User Details.
+            "All Users" means everyone sees this tariff.
+        </small>
     </div>
 </div>
 

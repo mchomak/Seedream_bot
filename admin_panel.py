@@ -721,6 +721,53 @@ async def toggle_freeze_user(
     return RedirectResponse(f"/admin/users/{user_id}", status_code=status.HTTP_303_SEE_OTHER)
 
 
+@app.post("/admin/users/{user_id}/groups")
+async def update_user_groups(
+    request: Request,
+    user_id: int,
+    groups: str = Form(""),
+    admin: AdminUser = Depends(require_admin),
+):
+    """Update user's A/B test groups."""
+    async with db.session() as session:
+        user = await session.get(User, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Parse comma-separated group names, filter empty strings
+        group_list = [g.strip() for g in groups.split(",") if g.strip()]
+        user.user_groups = group_list
+
+        await log_admin_action(
+            session,
+            admin_id=admin.id,
+            action="user_groups_update",
+            target_type="user",
+            target_id=str(user.user_id),
+            details={"groups": group_list},
+            ip_address=request.client.host,
+        )
+
+    return RedirectResponse(f"/admin/users/{user_id}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/api/groups")
+async def get_all_groups(admin: AdminUser = Depends(require_admin)):
+    """Get list of all unique user groups."""
+    async with db.session() as session:
+        # Get all unique groups from users
+        result = await session.execute(
+            select(User.user_groups).where(User.user_groups.isnot(None))
+        )
+        all_groups = set()
+        for row in result.fetchall():
+            if row[0]:
+                for group in row[0]:
+                    if group:
+                        all_groups.add(group)
+        return {"groups": sorted(list(all_groups))}
+
+
 @app.post("/admin/users/{user_id}/send-message")
 async def send_user_message(
     request: Request,
@@ -943,6 +990,18 @@ async def settings_page(request: Request, admin: AdminUser = Depends(require_adm
         )
         scenarios = scenarios_result.scalars().all()
 
+        # Get all unique user groups for dropdown
+        groups_result = await session.execute(
+            select(User.user_groups).where(User.user_groups.isnot(None))
+        )
+        all_groups = set()
+        for row in groups_result.fetchall():
+            if row[0]:
+                for group in row[0]:
+                    if group:
+                        all_groups.add(group)
+        available_groups = sorted(list(all_groups))
+
         return templates.TemplateResponse(
             "settings.html",
             {
@@ -951,6 +1010,7 @@ async def settings_page(request: Request, admin: AdminUser = Depends(require_adm
                 "settings": system_settings,
                 "packages": packages,
                 "scenarios": scenarios,
+                "available_groups": available_groups,
             },
         )
 
@@ -2389,6 +2449,7 @@ async def create_backup(
                     "is_bot": u.is_bot,
                     "is_frozen": u.is_frozen,
                     "ab_test_group": u.ab_test_group,
+                    "user_groups": u.user_groups or [],
                     "credits_balance": u.credits_balance,
                     "money_balance": float(u.money_balance) if u.money_balance else 0,
                     "free_generations_used": u.free_generations_used,
@@ -2467,10 +2528,12 @@ async def create_backup(
                     "id": tp.id,
                     "name": tp.name,
                     "credits": tp.credits,
-                    "price_rub": float(tp.price_rub) if tp.price_rub else 0,
-                    "price_stars": tp.price_stars,
+                    "price": float(tp.price) if tp.price else 0,
+                    "currency": tp.currency,
+                    "ab_test_group": tp.ab_test_group,
                     "is_active": tp.is_active,
                     "sort_order": tp.sort_order,
+                    "discount_percent": tp.discount_percent,
                     "created_at": tp.created_at.isoformat() if tp.created_at else None,
                 }
                 for tp in tariffs

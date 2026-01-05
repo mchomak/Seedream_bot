@@ -90,8 +90,9 @@ class User(Base):
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_frozen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # Account freeze status
 
-    # A/B testing group for tariff split testing
-    ab_test_group: Mapped[Optional[str]] = mapped_column(String(32))
+    # A/B testing groups for tariff split testing (list of group names)
+    ab_test_group: Mapped[Optional[str]] = mapped_column(String(32))  # Legacy single group
+    user_groups: Mapped[Optional[list]] = mapped_column(JSONB, default=list)  # Multiple groups as JSON array
 
     # Балансы
     credits_balance: Mapped[int] = mapped_column(
