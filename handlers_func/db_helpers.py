@@ -69,6 +69,7 @@ async def get_active_tariffs(session: AsyncSession, user_groups: Optional[List[s
     - If user_groups is None or empty, only "all users" tariffs are shown
     """
     from loguru import logger
+    import json
 
     result = await session.execute(
         select(TariffPackage)
@@ -78,24 +79,44 @@ async def get_active_tariffs(session: AsyncSession, user_groups: Optional[List[s
     all_tariffs = list(result.scalars().all())
 
     logger.info(f"[A/B] All active tariffs: {[(t.id, t.name, repr(t.ab_test_group)) for t in all_tariffs]}")
-    logger.info(f"[A/B] User groups: {user_groups}")
+    logger.info(f"[A/B] User groups (raw): {user_groups}, type: {type(user_groups)}")
+
+    # Normalize user_groups - handle string representation of list
+    normalized_user_groups = None
+    if user_groups:
+        if isinstance(user_groups, str):
+            # Handle string like '["test5"]' - parse as JSON
+            try:
+                normalized_user_groups = json.loads(user_groups)
+                logger.info(f"[A/B] Parsed user_groups from string: {normalized_user_groups}")
+            except (json.JSONDecodeError, TypeError):
+                normalized_user_groups = [user_groups]
+        elif isinstance(user_groups, list):
+            normalized_user_groups = user_groups
+
+    logger.info(f"[A/B] Normalized user groups: {normalized_user_groups}")
 
     # Filter tariffs based on user groups
     filtered_tariffs = []
     for tariff in all_tariffs:
-        # Empty string should also be treated as "all users"
-        tariff_group = tariff.ab_test_group.strip() if tariff.ab_test_group else None
+        # Clean tariff_group - strip quotes and handle "None" string
+        tariff_group = None
+        if tariff.ab_test_group:
+            tariff_group = tariff.ab_test_group.strip().strip("'\"")
+            # Handle string "None" as actual None
+            if tariff_group.lower() == "none" or not tariff_group:
+                tariff_group = None
 
         if not tariff_group:
-            # Tariff for all users (ab_test_group is None or empty string)
+            # Tariff for all users (ab_test_group is None, empty, or "None")
             logger.debug(f"[A/B] Tariff {tariff.id} '{tariff.name}' - for all users")
             filtered_tariffs.append(tariff)
-        elif user_groups and tariff_group in user_groups:
+        elif normalized_user_groups and tariff_group in normalized_user_groups:
             # Tariff for specific group and user is in that group
             logger.debug(f"[A/B] Tariff {tariff.id} '{tariff.name}' - group '{tariff_group}' matches user groups")
             filtered_tariffs.append(tariff)
         else:
-            logger.debug(f"[A/B] Tariff {tariff.id} '{tariff.name}' - group '{tariff_group}' NOT in user groups, skipping")
+            logger.debug(f"[A/B] Tariff {tariff.id} '{tariff.name}' - group '{tariff_group}' NOT in user groups {normalized_user_groups}, skipping")
 
     logger.info(f"[A/B] Filtered tariffs: {[(t.id, t.name) for t in filtered_tariffs]}")
     return filtered_tariffs

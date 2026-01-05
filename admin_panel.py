@@ -1123,6 +1123,13 @@ async def add_tariff(
     admin: AdminUser = Depends(require_admin),
 ):
     """Add new tariff package."""
+    # Clean ab_test_group value - strip quotes and handle "None" string
+    clean_group = None
+    if ab_test_group:
+        clean_group = ab_test_group.strip().strip("'\"")
+        if not clean_group or clean_group.lower() == "none":
+            clean_group = None
+
     async with db.session() as session:
         package = TariffPackage(
             name=name,
@@ -1130,7 +1137,7 @@ async def add_tariff(
             price=Decimal(str(price)),
             currency=currency,
             discount_percent=discount_percent,
-            ab_test_group=ab_test_group if ab_test_group else None,
+            ab_test_group=clean_group,
         )
         session.add(package)
 
@@ -1158,6 +1165,13 @@ async def update_tariff(
     admin: AdminUser = Depends(require_admin),
 ):
     """Update tariff package."""
+    # Clean ab_test_group value - strip quotes and handle "None" string
+    clean_group = None
+    if ab_test_group:
+        clean_group = ab_test_group.strip().strip("'\"")
+        if not clean_group or clean_group.lower() == "none":
+            clean_group = None
+
     async with db.session() as session:
         result = await session.execute(select(TariffPackage).where(TariffPackage.id == tariff_id))
         package = result.scalar_one_or_none()
@@ -1166,7 +1180,7 @@ async def update_tariff(
             package.credits = credits
             package.price = Decimal(str(price))
             package.is_active = is_active
-            package.ab_test_group = ab_test_group if ab_test_group else None
+            package.ab_test_group = clean_group
 
             await log_admin_action(
                 session,
@@ -1174,7 +1188,7 @@ async def update_tariff(
                 action="tariff_update",
                 target_type="tariff",
                 target_id=str(tariff_id),
-                details={"name": name, "credits": credits, "price": price, "is_active": is_active, "ab_test_group": ab_test_group},
+                details={"name": name, "credits": credits, "price": price, "is_active": is_active, "ab_test_group": clean_group},
                 ip_address=request.client.host,
             )
 
