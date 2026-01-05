@@ -296,8 +296,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 )).scalar_one_or_none()
                 if user:
                     user_groups = user.user_groups
+                    logger.debug(f"User {user_id} groups: {user_groups}")
 
             tariffs = await get_active_tariffs(s, user_groups)
+            logger.debug(f"Filtered tariffs for user {user_id}: {[(t.name, t.ab_test_group) for t in tariffs]}")
             single_price = await get_single_credit_price_rub(s)
             stars_rate = await get_stars_to_rub_rate(s)
 
@@ -326,7 +328,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         buttons.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
 
         kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-        text = T(lang, 'select_tariff')
+        text = f"💳 {T(lang, 'select_tariff')}\n\n{T(lang, 'tariff_desc')}"
 
         if edit:
             try:

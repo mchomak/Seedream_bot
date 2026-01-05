@@ -2,7 +2,7 @@
 """Keyboard builders for the Telegram bot."""
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
-from handlers_func.i18n_helpers import i18n, T 
+from handlers_func.i18n_helpers import get_i18n, T
 
 
 def _lang_display_name(code: str) -> str:
@@ -12,13 +12,13 @@ def _lang_display_name(code: str) -> str:
       1) i18n key: lang_name.<code>  (например lang_name.ru = Русский)
       2) fallback: code.upper()
     """
-    name = i18n.t(f"lang_name.{code}", lang=code)
+    name = get_i18n().t(f"lang_name.{code}", lang=code)
     return code.upper() if (not name or name == f"lang_name.{code}") else name
 
 
 def build_lang_kb() -> InlineKeyboardMarkup:
     """Build language selection keyboard."""
-    codes = i18n.available_languages()
+    codes = get_i18n().available_languages()
 
     buttons = [
         InlineKeyboardButton(text=_lang_display_name(code), callback_data=f"set_lang:{code}")

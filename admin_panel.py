@@ -1154,6 +1154,7 @@ async def update_tariff(
     credits: int = Form(...),
     price: float = Form(...),
     is_active: bool = Form(False),
+    ab_test_group: Optional[str] = Form(None),
     admin: AdminUser = Depends(require_admin),
 ):
     """Update tariff package."""
@@ -1165,6 +1166,7 @@ async def update_tariff(
             package.credits = credits
             package.price = Decimal(str(price))
             package.is_active = is_active
+            package.ab_test_group = ab_test_group if ab_test_group else None
 
             await log_admin_action(
                 session,
@@ -1172,7 +1174,7 @@ async def update_tariff(
                 action="tariff_update",
                 target_type="tariff",
                 target_id=str(tariff_id),
-                details={"name": name, "credits": credits, "price": price, "is_active": is_active},
+                details={"name": name, "credits": credits, "price": price, "is_active": is_active, "ab_test_group": ab_test_group},
                 ip_address=request.client.host,
             )
 

@@ -25,7 +25,7 @@ background_selected_header,Selected background colors:,Выбранные цве
 balance_generations,Generations: <b>{count}</b>,Генераций: <b>{count}</b>
 balance_price_per_gen,Price per generation: <b>{price} ₽</b>,Стоимость 1 генерации: <b>{price} ₽</b>
 balance_rubles,Rubles: <b>{amount} ₽</b>,Рублей: <b>{amount} ₽</b>
-balance_title,💰 <b>Your Balance</b>,💰 <b>привет</b>
+balance_title,💰 <b>Your Balance</b>,💰 <b>Ваш баланс</b>
 bg_label_beige,beige,бежевый
 bg_label_black,black,чёрный
 bg_label_pink,pink,розовый
@@ -41,7 +41,7 @@ btn_aspect_1_1,1:1 (4096x4096) — square,1:1 (4096x4096) — квадрат
 btn_aspect_3_4,3:4 (3072x4096) — marketplaces,3:4 (3072x4096) — маркетплейсы
 btn_aspect_9_16,9:16 (2304x4096) — stories,9:16 (2304x4096) — сторис
 btn_back,Back,Назад
-btn_balance,💰 Balance,💰 Баланс
+btn_balance,💰 Balance,💰 ПРИВЕТ
 btn_bg_beige,Beige background,Бежевый фон
 btn_bg_black,Black background,Чёрный фон
 btn_bg_pink,Pink background,Розовый фон
