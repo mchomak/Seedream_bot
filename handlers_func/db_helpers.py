@@ -68,6 +68,8 @@ async def get_active_tariffs(session: AsyncSession, user_groups: Optional[List[s
     - Tariffs with a specific ab_test_group are only shown to users in that group
     - If user_groups is None or empty, only "all users" tariffs are shown
     """
+    from loguru import logger
+
     result = await session.execute(
         select(TariffPackage)
         .where(TariffPackage.is_active == True)
@@ -75,16 +77,27 @@ async def get_active_tariffs(session: AsyncSession, user_groups: Optional[List[s
     )
     all_tariffs = list(result.scalars().all())
 
+    logger.info(f"[A/B] All active tariffs: {[(t.id, t.name, repr(t.ab_test_group)) for t in all_tariffs]}")
+    logger.info(f"[A/B] User groups: {user_groups}")
+
     # Filter tariffs based on user groups
     filtered_tariffs = []
     for tariff in all_tariffs:
-        if not tariff.ab_test_group:
-            # Tariff for all users
-            filtered_tariffs.append(tariff)
-        elif user_groups and tariff.ab_test_group in user_groups:
-            # Tariff for specific group and user is in that group
-            filtered_tariffs.append(tariff)
+        # Empty string should also be treated as "all users"
+        tariff_group = tariff.ab_test_group.strip() if tariff.ab_test_group else None
 
+        if not tariff_group:
+            # Tariff for all users (ab_test_group is None or empty string)
+            logger.debug(f"[A/B] Tariff {tariff.id} '{tariff.name}' - for all users")
+            filtered_tariffs.append(tariff)
+        elif user_groups and tariff_group in user_groups:
+            # Tariff for specific group and user is in that group
+            logger.debug(f"[A/B] Tariff {tariff.id} '{tariff.name}' - group '{tariff_group}' matches user groups")
+            filtered_tariffs.append(tariff)
+        else:
+            logger.debug(f"[A/B] Tariff {tariff.id} '{tariff.name}' - group '{tariff_group}' NOT in user groups, skipping")
+
+    logger.info(f"[A/B] Filtered tariffs: {[(t.id, t.name) for t in filtered_tariffs]}")
     return filtered_tariffs
 
 
