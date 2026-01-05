@@ -26,6 +26,7 @@ from aiogram.client.default import DefaultBotProperties
 
 from sqlalchemy import select, func, and_, or_, desc, case, extract
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import flag_modified
 
 from db import (
     Database,
@@ -745,6 +746,7 @@ async def update_user_groups(
         # Parse comma-separated group names, filter empty strings
         group_list = [g.strip() for g in groups.split(",") if g.strip()]
         user.user_groups = group_list
+        flag_modified(user, 'user_groups')  # Mark JSONB field as modified
 
         await log_admin_action(
             session,
@@ -812,10 +814,11 @@ async def bulk_add_group(
         for user_id in user_id_list:
             user = await session.get(User, user_id)
             if user:
-                current_groups = user.user_groups or []
+                current_groups = list(user.user_groups or [])  # Create a copy
                 if group_name not in current_groups:
                     current_groups.append(group_name)
                     user.user_groups = current_groups
+                    flag_modified(user, 'user_groups')  # Mark JSONB field as modified
                     updated_count += 1
 
         await log_admin_action(
