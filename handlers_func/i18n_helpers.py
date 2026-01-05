@@ -20,13 +20,24 @@ from localization import Localizer, LocalizerConfig, normalize_lang
 I18N_PATH = os.getenv("I18N_PATH", "locales/phrases.csv")
 DEFAULT_LANG = os.getenv("DEFAULT_LANG", "ru")
 
-i18n = Localizer(
-    LocalizerConfig(
-        path=I18N_PATH,
-        default_lang=DEFAULT_LANG,
-        strict_keys=False,  # True, если хотите падать на отсутствующих ключах
-    )
-).load()
+# Use a container dict so imports can access updated i18n via i18n_container["instance"]
+i18n_container = {
+    "instance": Localizer(
+        LocalizerConfig(
+            path=I18N_PATH,
+            default_lang=DEFAULT_LANG,
+            strict_keys=False,
+        )
+    ).load()
+}
+
+# Keep i18n as alias for backward compatibility with direct access
+i18n = i18n_container["instance"]
+
+
+def get_i18n() -> Localizer:
+    """Get current i18n instance. Use this instead of importing i18n directly."""
+    return i18n_container["instance"]
 
 
 def reload_translations() -> bool:
@@ -43,6 +54,8 @@ def reload_translations() -> bool:
                 strict_keys=False,
             )
         ).load()
+        # Update container so all modules using get_i18n() or i18n_container get new instance
+        i18n_container["instance"] = new_i18n
         i18n = new_i18n
         logger.info(f"Translations reloaded from {I18N_PATH}")
         return True
@@ -60,7 +73,7 @@ def _supported_lang(code: str | None) -> str:
     """
     code_n = normalize_lang(code, DEFAULT_LANG)
 
-    langs = set(i18n.available_languages())
+    langs = set(get_i18n().available_languages())
     if code_n in langs:
         return code_n
 
@@ -101,11 +114,11 @@ async def get_lang(event: Message | CallbackQuery, db: Optional[Database] = None
 
 def T(locale: str, key: str, **fmt) -> str:
     # ВАЖНО: locale передаём позиционно, чтобы fmt мог содержать ключ "lang"
-    return i18n.t(key, locale, **fmt)
+    return get_i18n().t(key, locale, **fmt)
 
 
 def T_item(locale: str, key: str, subkey: str, **fmt) -> str:
-    return i18n.t(f"{key}.{subkey}", locale, **fmt)
+    return get_i18n().t(f"{key}.{subkey}", locale, **fmt)
 
 
 async def install_bot_commands(bot: Bot, lang: str = "en") -> None:
@@ -114,7 +127,7 @@ async def install_bot_commands(bot: Bot, lang: str = "en") -> None:
     Берём описания из группы help_items.* (плоские ключи).
     """
     lang = _supported_lang(lang)
-    items = i18n.group("help_items", lang=lang)  # {"start": "...", "help": "...", ...}
+    items = get_i18n().group("help_items", lang=lang)  # {"start": "...", "help": "...", ...}
 
     cmds = [
         BotCommand(command="start", description=items.get("start", "start")),
