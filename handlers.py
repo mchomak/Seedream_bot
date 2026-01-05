@@ -437,7 +437,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             f"{T(lang, 'balance_title')}\n\n"
             f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
             f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
-            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
         )
 
         kb = InlineKeyboardMarkup(
@@ -750,7 +749,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             f"{T(lang, 'balance_title')}\n\n"
             f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
             f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
-            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
         )
 
         kb = InlineKeyboardMarkup(
