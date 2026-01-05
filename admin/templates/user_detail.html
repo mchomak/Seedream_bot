@@ -68,8 +68,16 @@
                         </td>
                     </tr>
                     <tr>
-                        <td class="text-muted">A/B Test Group:</td>
-                        <td>{{ user.ab_test_group or 'Default' }}</td>
+                        <td class="text-muted">Test Groups:</td>
+                        <td>
+                            {% if user.user_groups %}
+                                {% for group in user.user_groups %}
+                                <span class="badge bg-primary me-1">{{ group }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="text-muted">No groups (sees all tariffs)</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <td class="text-muted">Joined:</td>
@@ -102,6 +110,22 @@
                         <i class="fas fa-lock"></i> Freeze Account
                     </button>
                     {% endif %}
+                </form>
+
+                <hr>
+
+                <!-- A/B Test Groups Management -->
+                <h6 class="text-muted mb-2"><i class="fas fa-layer-group"></i> Test Groups</h6>
+                <form method="post" action="/admin/users/{{ user.id }}/groups">
+                    <div class="input-group mb-2">
+                        <input type="text" class="form-control" name="groups"
+                               value="{{ user.user_groups | join(', ') if user.user_groups else '' }}"
+                               placeholder="e.g., premium, beta_testers">
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="fas fa-save"></i> Save
+                        </button>
+                    </div>
+                    <small class="text-muted">Comma-separated group names. Leave empty for default (all tariffs visible).</small>
                 </form>
             </div>
         </div>

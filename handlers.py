@@ -284,9 +284,20 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         await message.answer(T(lang, "account_menu"), reply_markup=kb)
 
     async def _show_tariff_selection(message: Message, lang: str, edit: bool = False):
-        """Show tariff package selection with prices."""
+        """Show tariff package selection with prices filtered by user groups."""
+        user_id = message.from_user.id if message.from_user else None
+
         async with db.session() as s:
-            tariffs = await get_active_tariffs(s)
+            # Get user's groups for A/B testing
+            user_groups = None
+            if user_id:
+                user = (await s.execute(
+                    select(User).where(User.user_id == user_id)
+                )).scalar_one_or_none()
+                if user:
+                    user_groups = user.user_groups
+
+            tariffs = await get_active_tariffs(s, user_groups)
             single_price = await get_single_credit_price_rub(s)
             stars_rate = await get_stars_to_rub_rate(s)
 
@@ -315,7 +326,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
         buttons.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
 
         kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-        text = T(lang, "select_tariff")
+        text = f"💳 {T(lang, 'select_tariff')}\n\n{T(lang, 'tariff_desc')}"
 
         if edit:
             try:
@@ -437,6 +448,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             f"{T(lang, 'balance_title')}\n\n"
             f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
             f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
+            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
         )
 
         kb = InlineKeyboardMarkup(
@@ -749,6 +761,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer) -> Ro
             f"{T(lang, 'balance_title')}\n\n"
             f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
             f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
+            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
         )
 
         kb = InlineKeyboardMarkup(

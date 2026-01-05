@@ -6,10 +6,7 @@ from decimal import Decimal
 from typing import Optional, Any, List
 from sqlalchemy import select, func, asc
 from sqlalchemy.ext.asyncio import AsyncSession
-import os
-import sys
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from db import User, Transaction, TransactionStatus, Generation, GenerationStatus, ScenarioPrice, SystemSetting, TariffPackage, create_generation
 from config import GEN_SCENARIO_PRICES
 
@@ -63,14 +60,32 @@ def calculate_stars_for_rubles(rubles: Decimal, stars_to_rub_rate: Decimal) -> i
 
 # ========== Tariff Helpers ==========
 
-async def get_active_tariffs(session: AsyncSession) -> List[TariffPackage]:
-    """Get all active tariff packages sorted by sort_order."""
+async def get_active_tariffs(session: AsyncSession, user_groups: Optional[List[str]] = None) -> List[TariffPackage]:
+    """
+    Get active tariff packages sorted by sort_order, filtered by user groups.
+
+    - Tariffs with ab_test_group = None/empty are shown to everyone
+    - Tariffs with a specific ab_test_group are only shown to users in that group
+    - If user_groups is None or empty, only "all users" tariffs are shown
+    """
     result = await session.execute(
         select(TariffPackage)
         .where(TariffPackage.is_active == True)
         .order_by(asc(TariffPackage.sort_order))
     )
-    return list(result.scalars().all())
+    all_tariffs = list(result.scalars().all())
+
+    # Filter tariffs based on user groups
+    filtered_tariffs = []
+    for tariff in all_tariffs:
+        if not tariff.ab_test_group:
+            # Tariff for all users
+            filtered_tariffs.append(tariff)
+        elif user_groups and tariff.ab_test_group in user_groups:
+            # Tariff for specific group and user is in that group
+            filtered_tariffs.append(tariff)
+
+    return filtered_tariffs
 
 
 async def get_tariff_by_id(session: AsyncSession, tariff_id: int) -> Optional[TariffPackage]:
