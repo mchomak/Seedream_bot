@@ -4845,8 +4845,23 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     async def cmd_upload_translations(m: Message, state: FSMContext):
         """Admin command to upload new translations CSV file."""
         admin_ids = settings.telegram_admin_ids if settings else ()
-        if m.from_user.id not in admin_ids:
-            await m.answer("⛔ Access denied. This command is for admins only.")
+        user_id = m.from_user.id
+
+        logger.info(f"Upload translations command from user {user_id}, admin_ids={admin_ids}")
+
+        if not admin_ids:
+            await m.answer(
+                "⚠️ TELEGRAM_ADMIN_IDS not configured.\n\n"
+                f"Add your Telegram ID to .env file:\n"
+                f"<code>TELEGRAM_ADMIN_IDS={user_id}</code>"
+            )
+            return
+
+        if user_id not in admin_ids:
+            await m.answer(
+                f"⛔ Access denied. This command is for admins only.\n"
+                f"Your ID: <code>{user_id}</code>"
+            )
             return
 
         await state.set_state(AdminFlow.waiting_translations_file)
