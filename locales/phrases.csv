@@ -575,7 +575,7 @@ Processing is in progress on the neural network server.","任务已加入队列�
 unknown_lang,Неизвестный язык. Попробуйте ещё раз.,Unknown language. Please try again.,语言未知。请重试。,यह भाषा अज्ञात है। कृपया पुनः प्रयास करें।,Idioma desconocido. Inténtalo de nuevo.
 upload_doc_only,"Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия).",Please send the photo as a document in original quality (uncompressed).,请以文档形式发送原始质量（未压缩）的照片。,कृपया फोटो को मूल गुणवत्ता (बिना संपीड़ित किए) में दस्तावेज़ के रूप में भेजें।,Por favor envíe la foto como documento en calidad original (sin comprimir).
 upload_doc_wrong_type,"Это не похоже на изображение. Пожалуйста, отправьте фотографию одежды как документ (файл).",This doesn't look like the image. Please send a photo of the garment as a document (file).,这件衣服看起来和图片不符。请将衣服的照片以文档（文件）的形式发送给我。,यह तस्वीर से मेल नहीं खाता। कृपया कपड़े की एक तस्वीर दस्तावेज़ (फ़ाइल) के रूप में भेजें।,"Esto no se parece a la imagen. Por favor, envíe una foto de la prenda como documento (archivo)."
-upload_intro_full,"<b> Загрузите фотографии вещей, которые хотите надеть на модель. <b>
+upload_intro_full,"<b> Загрузите фотографии вещей, которые хотите надеть на модель. </b>
 (далее - текст)
 Шаг 1: Изучите рекомендации.
 - Обрежьте фото: Оставьте минимум лишнего помимо нужной вам одежды.
@@ -591,7 +591,7 @@ upload_intro_full,"<b> Загрузите фотографии вещей, ко�
 - Фото на манекене: Одежда на манекене, на фото нет головы манекена и минимум
 лишнего.
 Шаг 3: Загрузите фотографию одной или нескольких вещей
-Важно: Каждое загруженное фото считается как отдельная вещь.","<b> Upload photos of the items you want the model to wear. <b>
+Важно: Каждое загруженное фото считается как отдельная вещь.","<b> Upload photos of the items you want the model to wear. </b>
 (hereinafter referred to as text)
 Step 1: Review the guidelines.
 - Crop the photo: Leave as little excess as possible besides the clothes you want.
@@ -605,7 +605,7 @@ Step 2: Select the type of photo you are uploading and click the button:
 - Photo of a person: The clothes are being worn by a person, cropped to remove the face and minimize unnecessary elements.
 - Photo of a mannequin: The clothes are being worn on a mannequin, the photo should be free of the mannequin's head and contain as little excess as possible.
 Step 3: Upload a photo of one or more items.
-Important: Each uploaded photo is counted as a separate item.","<b>上传您希望模特穿着的服装照片。<b>
+Important: Each uploaded photo is counted as a separate item.","<b>上传您希望模特穿着的服装照片。</b>
 
 （以下简称“文字”）
 
@@ -631,7 +631,7 @@ Important: Each uploaded photo is counted as a separate item.","<b>上传您希�
 
 步骤 3：上传一张或多件服装的照片。
 
-重要提示：每张上传的照片都算作一个单独的项目。","<b> मॉडल को पहनाए जाने वाले कपड़ों की तस्वीरें अपलोड करें। <b>
+重要提示：每张上传的照片都算作一个单独的项目。","<b> मॉडल को पहनाए जाने वाले कपड़ों की तस्वीरें अपलोड करें। </b>
 (इसके बाद इसे टेक्स्ट कहा जाएगा)
 चरण 1: दिशा-निर्देशों की समीक्षा करें।
 
