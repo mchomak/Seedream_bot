@@ -871,31 +871,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             base_photos=[base_photo],
             current_base_index=0,
         )
-        # Assuming 1 generation = 10 rubles (you can adjust this)
-        PRICE_PER_GEN = 10
 
-        async with db.session() as s:
-            prof = await get_profile(s, tg_user_id=q.from_user.id)
-
-        text = (
-            f"{T(lang, 'balance_title')}\n\n"
-            f"{T(lang, 'balance_generations', count=prof.credits_balance)}\n"
-            f"{T(lang, 'balance_rubles', amount=prof.money_balance)}\n"
-            f"{T(lang, 'balance_price_per_gen', price=PRICE_PER_GEN)}"
-        )
-
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=T(lang, "btn_topup"), callback_data="account:topup")],
-                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")],
-            ]
-        )
-
-        try:
-            await q.message.edit_text(text, reply_markup=kb)
-        except Exception:
-            await q.message.answer(text, reply_markup=kb)
         await q.answer()
+        # Show the angles/poses menu with the base photo
+        await _show_angles_poses_menu(q.message, state, lang, db)
 
 
     # --- /buy (пополнение звездами) ---
@@ -2164,8 +2143,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         # --- Next: валидируем и идём к возрасту ---
         if action == "next":
             if not selected:
-                await q.answer(T(lang, "hair_need_one"), show_alert=True)
-                return
+                hair_main = "any"
+                hair_options = ["any"]
 
             # effective список для логики:
             if selected == {"any"}:
@@ -2780,30 +2759,95 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             async with db.session() as s:
                 prof = await get_profile(s, tg_user_id=q.from_user.id)
                 balance = prof.credits_balance
+                price_per_gen = await get_single_credit_price_rub(s)
 
-            base_text = T(
-                lang,
-                "confirm_generation_title",
-                items=num_items,
-                background=background_str,
-                gender=(
-                    GENDER_LABELS[data.get("gender") or "female"][0 if lang == "ru" else 1]
-                ),
-                hair=hair_str,
-                age=(
-                    AGE_LABELS[data.get("age") or "young"][0 if lang == "ru" else 1]
-                ),
-                style=style_str,
-                aspect=aspect_str,
-                balance=balance,
-                photos=photos,
-            )
+            # Build formula parts (only show multipliers > 1)
+            formula_parts = []
+            if lang == "ru":
+                items_word = "вещь" if num_items == 1 else ("вещи" if num_items < 5 else "вещей")
+                formula_parts.append(f"{num_items} {items_word}")
+                if bg_count > 1:
+                    formula_parts.append(f"{bg_count} (Фон: {background_str})")
+                if hair_count > 1:
+                    formula_parts.append(f"{hair_count} (Волосы: {hair_str})")
+                if style_count > 1:
+                    formula_parts.append(f"{style_count} (Стиль: {style_str})")
+                if aspect_count > 1:
+                    formula_parts.append(f"{aspect_count} (Соотношение сторон: {aspect_str})")
+                photos_word = "фото"
+            else:
+                items_word = "item" if num_items == 1 else "items"
+                formula_parts.append(f"{num_items} {items_word}")
+                if bg_count > 1:
+                    formula_parts.append(f"{bg_count} (Background: {background_str})")
+                if hair_count > 1:
+                    formula_parts.append(f"{hair_count} (Hair: {hair_str})")
+                if style_count > 1:
+                    formula_parts.append(f"{style_count} (Style: {style_str})")
+                if aspect_count > 1:
+                    formula_parts.append(f"{aspect_count} (Aspect ratio: {aspect_str})")
+                photos_word = "photo" if photos == 1 else "photos"
 
-            extra_text = (
-                "\n\n" + T(lang, "confirm_generation_ok")
-                if balance >= photos
-                else "\n\n" + T(lang, "confirm_generation_not_enough")
-            )
+            # Build the formula string
+            if len(formula_parts) > 1:
+                formula_str = " × ".join(formula_parts) + f" = {photos} {photos_word}"
+            else:
+                formula_str = f"{photos} {photos_word}"
+
+            # Build the message
+            gender_str = GENDER_LABELS[data.get("gender") or "female"][0 if lang == "ru" else 1]
+            age_str = AGE_LABELS[data.get("age") or "young"][0 if lang == "ru" else 1]
+
+            if lang == "ru":
+                balance_word = "генерация" if balance == 1 else ("генерации" if 2 <= balance <= 4 else "генераций")
+                base_text = (
+                    f"Количество вещей: {num_items}\n"
+                    f"Фон: {background_str}\n"
+                    f"Пол: {gender_str}\n"
+                    f"Волосы: {hair_str}\n"
+                    f"Возраст: {age_str}\n"
+                    f"Стиль: {style_str}\n"
+                    f"Соотношение сторон: {aspect_str}\n\n"
+                    f"Ваш баланс: {balance} {balance_word}\n\n"
+                    f"Вы создаёте {photos} {photos_word}"
+                )
+                if len(formula_parts) > 1:
+                    base_text += f" по формуле:\n{formula_str}."
+                else:
+                    base_text += "."
+            else:
+                balance_word = "generation" if balance == 1 else "generations"
+                base_text = (
+                    f"Items: {num_items}\n"
+                    f"Background: {background_str}\n"
+                    f"Gender: {gender_str}\n"
+                    f"Hair: {hair_str}\n"
+                    f"Age: {age_str}\n"
+                    f"Style: {style_str}\n"
+                    f"Aspect ratio: {aspect_str}\n\n"
+                    f"Your balance: {balance} {balance_word}\n\n"
+                    f"You are creating {photos} {photos_word}"
+                )
+                if len(formula_parts) > 1:
+                    base_text += f" by formula:\n{formula_str}."
+                else:
+                    base_text += "."
+
+            # Add appropriate ending message
+            if balance >= photos:
+                if lang == "ru":
+                    extra_text = "\n\nНажмите «Далее», чтобы создать фотографии."
+                else:
+                    extra_text = "\n\nTap \"Next\" to create photos."
+            else:
+                deficit = photos - balance
+                cost = int(deficit * price_per_gen)
+                if lang == "ru":
+                    deficit_word = "генерацию" if deficit == 1 else ("генерации" if 2 <= deficit <= 4 else "генераций")
+                    extra_text = f"\n\nПополните баланс на: {deficit} {deficit_word} ({cost} руб.) или нажмите «Назад» и уменьшите количество запрашиваемых фото."
+                else:
+                    deficit_word = "generation" if deficit == 1 else "generations"
+                    extra_text = f"\n\nTop up your balance by {deficit} {deficit_word} ({cost} RUB) or tap \"Back\" to reduce the number of requested photos."
 
             kb_buttons = [
                 [
@@ -4779,9 +4823,27 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         next_idx = current_idx + 1
 
         if next_idx >= len(base_photos):
-            # All done
-            await q.message.answer(T(lang, "all_base_photos_complete"))
+            # All done - show main menu
             await state.clear()
+            await q.message.answer(T(lang, "all_base_photos_complete"))
+
+            # Get dynamic values for start message
+            async with db.session() as s:
+                free_gens = await get_free_generations_limit(s)
+                price_per_gen = await get_single_credit_price_rub(s)
+
+            # Show main menu with inline buttons
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_start"), callback_data="start:generate")],
+                    [InlineKeyboardButton(text=T(lang, "kb_examples"), callback_data="start:examples")],
+                    [InlineKeyboardButton(text=T(lang, "kb_my_account"), callback_data="start:account")],
+                ]
+            )
+            await q.message.answer(
+                T(lang, 'start_title', free_generations=free_gens, price=price_per_gen),
+                reply_markup=kb
+            )
         else:
             # Show next base photo
             await state.update_data(current_base_index=next_idx)
