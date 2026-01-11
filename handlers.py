@@ -249,12 +249,111 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 is_premium=getattr(m.from_user, "is_premium", False),
                 is_bot=m.from_user.is_bot,
             )
+            # Get dynamic values from settings
+            free_gens = await get_free_generations_limit(s)
+            price_per_gen = await get_single_credit_price_rub(s)
         lang = await get_lang(m, db)
         await state.clear()  # Clear any existing state
-        await m.answer(
-            f"{T(lang, 'start_title')}",
-            reply_markup=build_main_keyboard(lang)
+
+        # Inline keyboard with main actions
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_start"), callback_data="start:generate")],
+                [InlineKeyboardButton(text=T(lang, "kb_examples"), callback_data="start:examples")],
+                [InlineKeyboardButton(text=T(lang, "kb_my_account"), callback_data="start:account")],
+            ]
         )
+
+        await m.answer(
+            T(lang, 'start_title', free_generations=free_gens, price=price_per_gen),
+            reply_markup=kb
+        )
+
+    # --- Start menu inline button handlers ---
+    @r.callback_query(F.data == "start:generate")
+    async def on_start_generate(q: CallbackQuery, state: FSMContext):
+        """Handle 'Start' button from welcome message - go directly to upload intro."""
+        from fsm import GenerationFlow
+
+        lang = await get_lang(q, db)
+
+        # Check if user has credits
+        async with db.session() as s:
+            user = (await s.execute(
+                select(User).where(User.user_id == q.from_user.id)
+            )).scalar_one_or_none()
+
+            if not user:
+                await q.answer(T(lang, "profile_not_found"), show_alert=True)
+                return
+
+        # Set state for upload type selection
+        await state.set_state(GenerationFlow.selecting_upload_type)
+
+        # Build keyboard with upload type options
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_upload_flat"), callback_data="gen:type:flat")],
+                [InlineKeyboardButton(text=T(lang, "btn_upload_on_person"), callback_data="gen:type:on_person")],
+                [InlineKeyboardButton(text=T(lang, "btn_upload_on_mannequin"), callback_data="gen:type:mannequin")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
+            ]
+        )
+
+        await q.answer()
+        try:
+            await q.message.edit_text(T(lang, "upload_intro_full"), reply_markup=kb)
+        except Exception:
+            await q.message.answer(T(lang, "upload_intro_full"), reply_markup=kb)
+
+        await state.update_data(
+            generate_prompt_msg_id=q.message.message_id,
+            generate_chat_id=q.message.chat.id,
+        )
+
+    @r.callback_query(F.data == "start:examples")
+    async def on_start_examples(q: CallbackQuery):
+        """Handle 'Examples' button from welcome message."""
+        lang = await get_lang(q, db)
+        await q.answer()
+        await q.message.answer(T(lang, "examples_soon"))
+
+    @r.callback_query(F.data == "start:account")
+    async def on_start_account(q: CallbackQuery):
+        """Handle 'My Account' button from welcome message."""
+        lang = await get_lang(q, db)
+        await q.answer()
+        await _show_account_menu(q.message, lang)
+
+    @r.callback_query(F.data == "start:back")
+    async def on_start_back(q: CallbackQuery, state: FSMContext):
+        """Handle 'Back' button - return to start menu."""
+        async with db.session() as s:
+            free_gens = await get_free_generations_limit(s)
+            price_per_gen = await get_single_credit_price_rub(s)
+
+        lang = await get_lang(q, db)
+        await state.clear()
+
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(lang, "btn_start"), callback_data="start:generate")],
+                [InlineKeyboardButton(text=T(lang, "kb_examples"), callback_data="start:examples")],
+                [InlineKeyboardButton(text=T(lang, "kb_my_account"), callback_data="start:account")],
+            ]
+        )
+
+        await q.answer()
+        try:
+            await q.message.edit_text(
+                T(lang, 'start_title', free_generations=free_gens, price=price_per_gen),
+                reply_markup=kb
+            )
+        except Exception:
+            await q.message.answer(
+                T(lang, 'start_title', free_generations=free_gens, price=price_per_gen),
+                reply_markup=kb
+            )
 
     # --- /help ---
     @r.message(Command("help"))
@@ -1185,7 +1284,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await q.answer(T(lang, "unknown_lang"), show_alert=True)
             return
 
-        # Persist language
+        # Persist language and get settings for welcome message
         async with db.session() as s:
             await upsert_user_basic(
                 s,
@@ -1196,6 +1295,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 is_premium=getattr(q.from_user, "is_premium", False),
                 is_bot=q.from_user.is_bot,
             )
+            # Get dynamic values for start message
+            free_gens = await get_free_generations_limit(s)
+            price_per_gen = await get_single_credit_price_rub(s)
 
         # Acknowledge
         await q.answer("OK")
@@ -1208,11 +1310,20 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         except Exception:
             pass
 
-        # Update persistent keyboard with translated buttons
+        # Inline keyboard with main actions
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=T(new_lang, "btn_start"), callback_data="start:generate")],
+                [InlineKeyboardButton(text=T(new_lang, "kb_examples"), callback_data="start:examples")],
+                [InlineKeyboardButton(text=T(new_lang, "kb_my_account"), callback_data="start:account")],
+            ]
+        )
+
+        # Send start message with inline buttons
         await bot.send_message(
             chat_id=q.message.chat.id,
-            text=T(new_lang, "start_title"),
-            reply_markup=build_main_keyboard(new_lang),
+            text=T(new_lang, "start_title", free_generations=free_gens, price=price_per_gen),
+            reply_markup=kb,
         )
 
         # Update bot commands for this user's chat
@@ -1273,19 +1384,20 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await m.answer(T(lang, "no_credits"))
             return
 
+        # Skip intro, go directly to upload type selection
+        from fsm import GenerationFlow
+        await state.set_state(GenerationFlow.selecting_upload_type)
+
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_start"),
-                        callback_data="gen:start",
-                    )
-                ]
+                [InlineKeyboardButton(text=T(lang, "btn_upload_flat"), callback_data="gen:type:flat")],
+                [InlineKeyboardButton(text=T(lang, "btn_upload_on_person"), callback_data="gen:type:on_person")],
+                [InlineKeyboardButton(text=T(lang, "btn_upload_on_mannequin"), callback_data="gen:type:mannequin")],
+                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="gen:back_to_menu")],
             ]
         )
 
-        await state.clear()
-        sent = await m.answer(T(lang, "generate_intro_short"), reply_markup=kb)
+        sent = await m.answer(T(lang, "upload_intro_full"), reply_markup=kb)
         await state.update_data(
             generate_prompt_msg_id=sent.message_id,
             generate_chat_id=sent.chat.id,
@@ -1444,54 +1556,37 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         await state.set_state(GenerationFlow.selecting_upload_type)
 
 
-    @r.callback_query(F.data == "gen:back_to_intro")
-    async def on_gen_back_to_intro(q: CallbackQuery, state: FSMContext):
+    @r.callback_query(F.data.in_(["gen:back_to_intro", "gen:back_to_start", "gen:back_to_menu"]))
+    async def on_gen_back_to_menu(q: CallbackQuery, state: FSMContext):
         """
-        Возврат к самому первому экрану /generate.
+        Возврат к главному меню /start.
         """
+        async with db.session() as s:
+            free_gens = await get_free_generations_limit(s)
+            price_per_gen = await get_single_credit_price_rub(s)
+
         lang = await get_lang(q, db)
+        await state.clear()
 
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_start"),
-                        callback_data="gen:start",
-                    )
-                ]
+                [InlineKeyboardButton(text=T(lang, "btn_start"), callback_data="start:generate")],
+                [InlineKeyboardButton(text=T(lang, "kb_examples"), callback_data="start:examples")],
+                [InlineKeyboardButton(text=T(lang, "kb_my_account"), callback_data="start:account")],
             ]
         )
 
         await q.answer()
         try:
             await q.message.edit_text(
-                T(lang, "generate_intro_short"),
+                T(lang, 'start_title', free_generations=free_gens, price=price_per_gen),
                 reply_markup=kb,
             )
         except Exception:
-            await q.message.answer(T(lang, "generate_intro_short"), reply_markup=kb)
-
-        await state.clear()
-
-    # --- Назад из выбора режима к старту загрузки ---
-    @r.callback_query(F.data == "gen:back_to_start")
-    async def on_gen_back_to_start(q: CallbackQuery, state: FSMContext):
-        lang = await get_lang(q, db)
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    InlineKeyboardButton(
-                        text=T(lang, "btn_start"),
-                        callback_data="gen:start",
-                    )
-                ]
-            ]
-        )
-        try:
-            await q.message.edit_text(T(lang, "generate_intro_short"), reply_markup=kb)
-        except Exception:
-            await q.message.answer(T(lang, "generate_intro_short"), reply_markup=kb)
-        await state.clear()
+            await q.message.answer(
+                T(lang, 'start_title', free_generations=free_gens, price=price_per_gen),
+                reply_markup=kb
+            )
 
 
     # --- Обработчик фото в рамках сценария генерации ---
