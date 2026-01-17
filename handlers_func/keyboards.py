@@ -16,12 +16,17 @@ def _lang_display_name(code: str) -> str:
     return code.upper() if (not name or name == f"lang_name.{code}") else name
 
 
-def build_lang_kb() -> InlineKeyboardMarkup:
-    """Build language selection keyboard."""
+def build_lang_kb(callback_prefix: str = "set_lang") -> InlineKeyboardMarkup:
+    """Build language selection keyboard.
+
+    Args:
+        callback_prefix: Prefix for callback data (default: "set_lang").
+                        Use "account:set_lang" for account menu context.
+    """
     codes = get_i18n().available_languages()
 
     buttons = [
-        InlineKeyboardButton(text=_lang_display_name(code), callback_data=f"set_lang:{code}")
+        InlineKeyboardButton(text=_lang_display_name(code), callback_data=f"{callback_prefix}:{code}")
         for code in codes
     ]
 
