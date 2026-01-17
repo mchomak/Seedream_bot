@@ -371,16 +371,23 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
 
     # --- /profile (now Account Menu) ---
-    async def _show_account_menu(message: Message, lang: str):
-        """Show the account menu with Balance and History buttons."""
+    async def _show_account_menu(message: Message, lang: str, edit: bool = False):
+        """Show the account menu with Balance, History, Language and Back buttons."""
         kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text=T(lang, "btn_balance"), callback_data="account:balance")],
                 [InlineKeyboardButton(text=T(lang, "btn_history"), callback_data="account:history:0")],
+                [InlineKeyboardButton(text=T(lang, "btn_language"), callback_data="account:language")],
                 [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:back")],
             ]
         )
-        await message.answer(T(lang, "account_menu"), reply_markup=kb)
+        if edit:
+            try:
+                await message.edit_text(T(lang, "account_menu"), reply_markup=kb)
+            except Exception:
+                await message.answer(T(lang, "account_menu"), reply_markup=kb)
+        else:
+            await message.answer(T(lang, "account_menu"), reply_markup=kb)
 
     async def _show_tariff_selection(message: Message, lang: str, edit: bool = False, tg_user_id: int = None):
         """Show tariff package selection with prices filtered by user groups."""
@@ -448,7 +455,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         buttons.append([InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")])
 
         kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-        text = T(lang, 'select_tariff')
+        text = f"💳 {T(lang, 'select_tariff')}\n\n{T(lang, 'tariff_desc')}"
 
         if edit:
             try:
@@ -510,19 +517,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 await message.answer(text, reply_markup=kb)
         else:
             await message.answer(text, reply_markup=kb)
-
-    # --- /profile (now Account Menu) ---
-
-    async def _show_account_menu(message: Message, lang: str):
-        """Show the account menu with Balance and History buttons."""
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=T(lang, "btn_balance"), callback_data="account:balance")],
-                [InlineKeyboardButton(text=T(lang, "btn_history"), callback_data="account:history:0")],
-                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:back")],
-            ]
-        )
-        await message.answer(T(lang, "account_menu"), reply_markup=kb)
 
     @r.message(Command("profile"))
     async def cmd_profile(m: Message):
@@ -611,20 +605,65 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     async def on_account_menu(q: CallbackQuery):
         """Return to account menu."""
         lang = await get_lang(q, db)
+        await _show_account_menu(q.message, lang, edit=True)
+        await q.answer()
 
-        kb = InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text=T(lang, "btn_balance"), callback_data="account:balance")],
-                [InlineKeyboardButton(text=T(lang, "btn_history"), callback_data="account:history:0")],
-                [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:back")],
-            ]
-        )
+    @r.callback_query(F.data == "account:language")
+    async def on_account_language(q: CallbackQuery):
+        """Show language selection from account menu."""
+        lang = await get_lang(q, db)
+
+        # Build language keyboard with account-specific callback prefix
+        lang_kb = _build_lang_kb(callback_prefix="account:set_lang")
+        # Add back button to return to account menu
+        lang_kb.inline_keyboard.append([
+            InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="account:menu")
+        ])
 
         try:
-            await q.message.edit_text(T(lang, "account_menu"), reply_markup=kb)
+            await q.message.edit_text(T(lang, "choose_lang_title"), reply_markup=lang_kb)
         except Exception:
-            await q.message.answer(T(lang, "account_menu"), reply_markup=kb)
+            await q.message.answer(T(lang, "choose_lang_title"), reply_markup=lang_kb)
         await q.answer()
+
+    @r.callback_query(F.data.startswith("account:set_lang:"))
+    async def on_account_set_lang(q: CallbackQuery, bot: Bot):
+        """Handle language selection from account menu - return to account menu after."""
+        parts = q.data.split(":")
+        if len(parts) < 3:
+            await q.answer("Oops")
+            return
+
+        new_lang = parts[2]
+        if new_lang not in get_i18n().available_languages():
+            lang = await get_lang(q, db)
+            await q.answer(T(lang, "unknown_lang"), show_alert=True)
+            return
+
+        # Persist language
+        async with db.session() as s:
+            await upsert_user_basic(
+                s,
+                user_id=q.from_user.id,
+                tg_username=q.from_user.username,
+                lang=new_lang,
+                last_seen_at=datetime.now(timezone.utc),
+                is_premium=getattr(q.from_user, "is_premium", False),
+                is_bot=q.from_user.is_bot,
+            )
+
+        # Acknowledge
+        await q.answer("OK")
+
+        # Update persistent Reply keyboard with new language
+        await bot.send_message(
+            chat_id=q.message.chat.id,
+            text=T(new_lang, "keyboard_updated"),
+            reply_markup=build_main_keyboard(new_lang),
+        )
+
+        # Return to account menu with new language
+        await _show_account_menu(q.message, new_lang, edit=False)
 
 
     @r.callback_query(F.data.startswith("account:history:"))
@@ -1288,6 +1327,13 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             )
         except Exception:
             pass
+
+        # Update persistent Reply keyboard with new language
+        await bot.send_message(
+            chat_id=q.message.chat.id,
+            text=T(new_lang, "keyboard_updated"),
+            reply_markup=build_main_keyboard(new_lang),
+        )
 
         # Inline keyboard with main actions
         kb = InlineKeyboardMarkup(
@@ -2143,8 +2189,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         # --- Next: валидируем и идём к возрасту ---
         if action == "next":
             if not selected:
-                hair_main = "any"
-                hair_options = ["any"]
+                await q.answer(T(lang, "hair_need_one"), show_alert=True)
+                return
 
             # effective список для логики:
             if selected == {"any"}:
@@ -3366,32 +3412,57 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         )
 
                     # Success - download images and update generation status
+                    download_failed = False
                     for url in result_urls:
-                        download_url = await asyncio.to_thread(
-                            seedream.get_download_url, url
-                        )
-                        img_bytes = await asyncio.to_thread(
-                            seedream.download_file_bytes, download_url
-                        )
-                        image_records.append(
-                            {
-                                "url": url,
-                                "bytes": img_bytes,
-                                "generation_id": generation_id,
-                                "background": meta["background"],
-                                "hair": meta["hair"],
-                                "style": meta["style"],
-                                "aspect": meta["aspect"],
-                            }
-                        )
+                        try:
+                            download_url = await asyncio.to_thread(
+                                seedream.get_download_url, url
+                            )
+                            img_bytes = await asyncio.to_thread(
+                                seedream.download_file_bytes, download_url
+                            )
+                            image_records.append(
+                                {
+                                    "url": url,
+                                    "bytes": img_bytes,
+                                    "generation_id": generation_id,
+                                    "background": meta["background"],
+                                    "hair": meta["hair"],
+                                    "style": meta["style"],
+                                    "aspect": meta["aspect"],
+                                }
+                            )
+                        except Exception as dl_err:
+                            download_failed = True
+                            logger.error(
+                                f"Failed to download image from {url}: {repr(dl_err)}",
+                                extra={"generation_id": generation_id, "url": url}
+                            )
+                            # Save the URL even if download failed - user can retry later
+                            image_records.append(
+                                {
+                                    "url": url,
+                                    "bytes": None,  # Mark as not downloaded
+                                    "generation_id": generation_id,
+                                    "background": meta["background"],
+                                    "hair": meta["hair"],
+                                    "style": meta["style"],
+                                    "aspect": meta["aspect"],
+                                    "download_failed": True,
+                                }
+                            )
 
-                    # Update generation status to succeeded
+                    # Update generation status
                     async with db.session() as s:
                         gen_db = (
                             await s.execute(select(Generation).where(Generation.id == generation_id))
                         ).scalar_one_or_none()
                         if gen_db:
-                            gen_db.status = GenerationStatus.succeeded
+                            if download_failed:
+                                gen_db.status = GenerationStatus.succeeded  # Generation succeeded, download failed
+                                gen_db.error_message = "Image download failed - tap 'Retry Download' to try again"
+                            else:
+                                gen_db.status = GenerationStatus.succeeded
                             gen_db.images_generated = len(result_urls)
                             gen_db.finished_at = datetime.now(timezone.utc)
 
@@ -3401,8 +3472,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 except Exception as e:
                     last_error = e
                     logger.warning(
-                        "Seedream combo failed (wait/result) "
-                        "— for task {task_id}",
+                        f"Seedream combo failed (wait/result) — for task {task_id}",
                         extra={
                             "task_id": task_id,
                             "meta": meta,
@@ -3472,13 +3542,59 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # Check if we got any images
         if not image_records:
-            await state.clear()
+            # Save params for regeneration
+            await state.update_data(
+                last_generation_params={
+                    "task_meta_list": task_meta_list,
+                    "upload_type": upload_type,
+                    "settings_mode": data.get("settings_mode"),
+                }
+            )
+
             err_text = T(lang, "generation_failed")
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_regenerate"), callback_data="gen:regenerate")],
+                    [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
+                ]
+            )
             try:
-                await q.message.edit_text(err_text)
+                await q.message.edit_text(err_text, reply_markup=kb)
             except Exception:
-                await q.message.answer(err_text)
+                await q.message.answer(err_text, reply_markup=kb)
             return
+
+        # Check if any images failed to download
+        failed_downloads = [rec for rec in image_records if rec.get("download_failed")]
+        successful_downloads = [rec for rec in image_records if not rec.get("download_failed") and rec.get("bytes")]
+
+        if failed_downloads and not successful_downloads:
+            # All downloads failed - show retry/regenerate options
+            await state.update_data(
+                failed_image_urls=[rec["url"] for rec in failed_downloads],
+                last_generation_params={
+                    "task_meta_list": task_meta_list,
+                    "upload_type": upload_type,
+                    "settings_mode": data.get("settings_mode"),
+                }
+            )
+
+            err_text = T(lang, "download_failed")
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_retry_download"), callback_data="gen:retry_download")],
+                    [InlineKeyboardButton(text=T(lang, "btn_regenerate"), callback_data="gen:regenerate")],
+                    [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
+                ]
+            )
+            try:
+                await q.message.edit_text(err_text, reply_markup=kb)
+            except Exception:
+                await q.message.answer(err_text, reply_markup=kb)
+            return
+
+        # Use only successfully downloaded images
+        image_records = successful_downloads
 
         # Save generated images to database
         async with db.session() as s:
@@ -3515,6 +3631,247 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         await state.set_state(GenerationFlow.reviewing_photos)
 
         # Show first photo with approval buttons
+        await _show_photo_for_review(q.message, state, lang, db)
+
+
+    # --- Regenerate handler ---
+    @r.callback_query(F.data == "gen:regenerate")
+    async def on_gen_regenerate(q: CallbackQuery, state: FSMContext, bot: Bot):
+        """Handle regenerate request - retry generation with same parameters."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        data = await state.get_data()
+        last_params = data.get("last_generation_params")
+
+        if not last_params:
+            err_text = T(lang, "regenerate_no_params")
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_start"), callback_data="start:generate")],
+                ]
+            )
+            try:
+                await q.message.edit_text(err_text, reply_markup=kb)
+            except Exception:
+                await q.message.answer(err_text, reply_markup=kb)
+            return
+
+        # Show processing message
+        try:
+            await q.message.edit_text(T(lang, "regenerating"))
+        except Exception:
+            await q.message.answer(T(lang, "regenerating"))
+
+        # Re-run generation with saved parameters
+        task_meta_list = last_params.get("task_meta_list", [])
+
+        if not task_meta_list:
+            err_text = T(lang, "regenerate_no_params")
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_start"), callback_data="start:generate")],
+                ]
+            )
+            await q.message.answer(err_text, reply_markup=kb)
+            return
+
+        # Re-create tasks for each meta
+        image_records: list[dict[str, Any]] = []
+        failed_combos = 0
+
+        for meta in task_meta_list:
+            generation_id = meta["generation_id"]
+            combo_success = False
+
+            for attempt in range(1, 4):
+                try:
+                    # Create new task
+                    new_task_id = await asyncio.to_thread(
+                        seedream.create_task,
+                        meta["prompt"],
+                        image_size=meta["image_size"],
+                        image_resolution=meta["image_resolution"],
+                        max_images=meta.get("max_images", 1),
+                        image_urls=[meta["cloth_url"]],
+                    )
+
+                    # Wait for result
+                    task_info = await asyncio.to_thread(
+                        seedream.wait_for_result,
+                        new_task_id,
+                        poll_interval=5.0,
+                        timeout=180.0,
+                    )
+
+                    data_info = task_info.get("data", {})
+                    result_json_str = data_info.get("resultJson")
+                    if not result_json_str:
+                        raise RuntimeError("No resultJson")
+
+                    result_obj = json.loads(result_json_str)
+                    result_urls = result_obj.get("resultUrls") or []
+                    if not result_urls:
+                        raise RuntimeError("No resultUrls")
+
+                    # Download images
+                    for url in result_urls:
+                        try:
+                            download_url = await asyncio.to_thread(seedream.get_download_url, url)
+                            img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+                            image_records.append({
+                                "url": url,
+                                "bytes": img_bytes,
+                                "generation_id": generation_id,
+                                "background": meta["background"],
+                                "hair": meta["hair"],
+                                "style": meta["style"],
+                                "aspect": meta["aspect"],
+                            })
+                        except Exception as dl_err:
+                            logger.error(f"Regenerate download failed: {repr(dl_err)}")
+
+                    combo_success = True
+                    break
+
+                except Exception as e:
+                    logger.warning(f"Regenerate attempt {attempt} failed: {repr(e)}")
+                    if attempt >= 3:
+                        break
+
+            if not combo_success:
+                failed_combos += 1
+
+        if not image_records:
+            # All failed again
+            err_text = T(lang, "generation_failed")
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_regenerate"), callback_data="gen:regenerate")],
+                    [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
+                ]
+            )
+            await q.message.answer(err_text, reply_markup=kb)
+            return
+
+        # Save images and proceed to review
+        async with db.session() as s:
+            for rec in image_records:
+                img = GeneratedImage(
+                    generation_id=rec["generation_id"],
+                    user_id=q.from_user.id,
+                    role=ImageRole.base,
+                    storage_url=rec["url"],
+                    telegram_file_id=None,
+                    width=None,
+                    height=None,
+                    meta={
+                        "background": rec["background"],
+                        "hair": rec["hair"],
+                        "style": rec["style"],
+                        "aspect": rec["aspect"],
+                    },
+                )
+                s.add(img)
+
+        await state.update_data(
+            review_photos=image_records,
+            current_photo_index=0,
+            approved_photos=[],
+            rejected_photos=[],
+        )
+        await state.set_state(GenerationFlow.reviewing_photos)
+        await _show_photo_for_review(q.message, state, lang, db)
+
+
+    @r.callback_query(F.data == "gen:retry_download")
+    async def on_gen_retry_download(q: CallbackQuery, state: FSMContext):
+        """Handle retry download request."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        data = await state.get_data()
+        failed_urls = data.get("failed_image_urls", [])
+        last_params = data.get("last_generation_params", {})
+        task_meta_list = last_params.get("task_meta_list", [])
+
+        if not failed_urls:
+            err_text = T(lang, "no_failed_downloads")
+            await q.message.answer(err_text)
+            return
+
+        try:
+            await q.message.edit_text(T(lang, "retrying_download"))
+        except Exception:
+            await q.message.answer(T(lang, "retrying_download"))
+
+        # Try to download the failed images
+        image_records: list[dict[str, Any]] = []
+        still_failed = []
+
+        for url in failed_urls:
+            try:
+                download_url = await asyncio.to_thread(seedream.get_download_url, url)
+                img_bytes = await asyncio.to_thread(seedream.download_file_bytes, download_url)
+
+                # Find matching meta
+                meta = next((m for m in task_meta_list if True), {})  # Use first meta as fallback
+                image_records.append({
+                    "url": url,
+                    "bytes": img_bytes,
+                    "generation_id": meta.get("generation_id"),
+                    "background": meta.get("background", "white"),
+                    "hair": meta.get("hair", "any"),
+                    "style": meta.get("style", "casual"),
+                    "aspect": meta.get("aspect", "3_4"),
+                })
+            except Exception as e:
+                logger.error(f"Retry download failed for {url}: {repr(e)}")
+                still_failed.append(url)
+
+        if not image_records:
+            # Still all failed
+            await state.update_data(failed_image_urls=still_failed)
+            err_text = T(lang, "download_failed")
+            kb = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text=T(lang, "btn_retry_download"), callback_data="gen:retry_download")],
+                    [InlineKeyboardButton(text=T(lang, "btn_regenerate"), callback_data="gen:regenerate")],
+                    [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
+                ]
+            )
+            await q.message.answer(err_text, reply_markup=kb)
+            return
+
+        # Save successfully downloaded images
+        async with db.session() as s:
+            for rec in image_records:
+                if rec.get("generation_id"):
+                    img = GeneratedImage(
+                        generation_id=rec["generation_id"],
+                        user_id=q.from_user.id,
+                        role=ImageRole.base,
+                        storage_url=rec["url"],
+                        telegram_file_id=None,
+                        width=None,
+                        height=None,
+                        meta={
+                            "background": rec["background"],
+                            "hair": rec["hair"],
+                            "style": rec["style"],
+                            "aspect": rec["aspect"],
+                        },
+                    )
+                    s.add(img)
+
+        await state.update_data(
+            review_photos=image_records,
+            current_photo_index=0,
+            approved_photos=[],
+            rejected_photos=[],
+            failed_image_urls=still_failed,
+        )
+        await state.set_state(GenerationFlow.reviewing_photos)
         await _show_photo_for_review(q.message, state, lang, db)
 
 
