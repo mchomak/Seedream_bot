@@ -115,7 +115,7 @@ btn_use_as_base,🎨 Использовать как базу,🎨 Use as a base
 btn_yes_finish,"✅ Да, завершить","✅ Yes, complete",✅ 是的，已完成,"✅ हाँ, पूरा","✅ Sí, completo"
 cancel_done,Текущий сценарий отменён. Вы в главном меню.,The current scenario has been cancelled. You are back to the main menu.,当前场景已取消。您已返回主菜单。,वर्तमान परिदृश्य रद्द कर दिया गया है। आप मुख्य मेनू पर वापस आ गए हैं।,El escenario actual ha sido cancelado. Has vuelto al menú principal.
 choose_lang_title,Выберите язык интерфейса:,Select interface language:,选择界面语言：,इंटरफ़ेस भाषा चुनें:,Seleccionar el idioma de la interfaz:
-confirm_finish_photo,"Вы уверены, что хотите завершить работу с этим фото?",Are you sure you want to finish working with this photo?,你确定要完成对这张照片的处理吗？,क्या आप वाकई इस फोटो पर काम पूरा करना चाहते हैं?,¿Estás seguro de que deseas terminar de trabajar con esta foto?
+confirm_finish_photo,"Вы уверены, что хотите завершить работу с этим фото?",Are you sure you want to finish working with this photo?,你确定要完成这张照片的处理吗？,क्या आप वाकई इस फोटो पर काम पूरा करना चाहते हैं?,¿Estás seguro de que deseas terminar de trabajar con esta foto?
 confirm_generation_not_enough,Недостаточно генераций на балансе. Пополните баланс через /buy или уменьшите количество запрашиваемых фото.,Not enough generations in your balance. Top up your balance via /buy or reduce the number of photos requested.,您的余额不足，无法进行更多次的拍摄。请通过 /buy 命令充值，或减少请求的照片数量。,आपके खाते में पर्याप्त संख्या में फ़ोटो नहीं हैं। /buy के माध्यम से अपना खाता भरें या अनुरोधित फ़ोटो की संख्या कम करें।,No hay suficientes generaciones en tu saldo. Recarga tu saldo con /comprar o reduce la cantidad de fotos solicitadas.
 confirm_generation_ok,"Нажмите «Далее», чтобы создать фотографии.",Click Next to create photos.,点击“下一步”创建照片。,फोटो बनाने के लिए Next पर क्लिक करें।,Haga clic en Siguiente para crear fotos.
 confirm_generation_title,"<b>Проверка перед генерацией</b>
@@ -129,18 +129,18 @@ confirm_generation_title,"<b>Проверка перед генерацией</b
 Соотношение сторон: {aspect}
 
 Ваш баланс: {balance} генераций.
-Вы создаёте {photos} фото.","<b>Check before generation</b>
+Вы создаёте {photos} фото.","<b>Pre-Generation Check</b>
 
-Number of items: {items}
+Number of Items: {items}
 Background: {background}
 Gender: {gender}
 Hair: {hair}
 Age: {age}
 Style: {style}
-Aspect ratio: {aspect}
+Aspect Ratio: {aspect}
 
-Your balance: {balance} generations.
-You create {photos} photos.","<b>生成前请检查</b>
+Your Balance: {balance} generations.
+You create {photos} photos.","<b>生成前检查</b>
 
 物品数量：{items}
 
@@ -156,9 +156,9 @@ You create {photos} photos.","<b>生成前请检查</b>
 
 宽高比：{aspect}
 
-您的剩余生成次数：{balance} 次。
+您的余额：{balance} 代。
 
-您创建了 {photos} 张照片。","जनरेशन से पहले जांच लें
+您创建了 {photos} 张照片。","<b>पूर्व-पीढ़ी जाँच</b>
 
 आइटमों की संख्या: {आइटम}
 पृष्ठभूमि: {पृष्ठभूमि}
@@ -168,8 +168,8 @@ You create {photos} photos.","<b>生成前请检查</b>
 शैली: {शैली}
 आस्पेक्ट रेशियो: {आस्पेक्ट}
 
-आपका बैलेंस: {बैलेंस} जनरेशन।
-आप {फ़ोटो} फ़ोटो बनाते हैं।","Verificar antes de generar
+आपका बैलेंस: {बैलेंस} पीढ़ियाँ।
+आप {फ़ोटो} फ़ोटो बनाते हैं।","Comprobación de pregeneración
 
 Número de elementos: {elementos}
 Fondo: {fondo}
@@ -235,7 +235,7 @@ history_item,"📅 {datetime}
 📝 पैरामीटर: {params}","📅 {datetime}
 💰 Costo: {cost} créditos
 📝 Parámetros: {params}"
-history_month_limit,Показаны генерации за последний месяц,Generations for the last month are shown,显示了上个月的世代数据。,पिछले महीने की पीढ़ियों को दर्शाया गया है।,Se muestran las generaciones del último mes.
+history_month_limit,Показаны генерации за последний месяц,Generations for the last month are shown,显示了上个月的世代变化情况。,पिछले महीने की पीढ़ियों को दर्शाया गया है,Se muestran las generaciones del último mes.
 history_page,Страница {page} из {total},Page {page} of {total},第 {page} 页，共 {total} 页,कुल पृष्ठों में से {पृष्ठ},Página {page} de {total}
 history_title,📜 <b>История генераций</b>,📜 <b>Generation history</b>,📜 <b>世代历史</b>,📜 <b>पीढ़ीगत इतिहास</b>,📜 <b>Historial generacional</b>
 insufficient_balance,"Недостаточно средств для повторной генерации. Пожалуйста, пополните баланс.",Insufficient funds to regenerate. Please top up your balance.,余额不足，无法充值。请充值。,पुनर्जीवन के लिए अपर्याप्त धनराशि। कृपया अपनी धनराशि बढ़ाएँ।,"No hay fondos suficientes para regenerar. Por favor, recargue su saldo."
@@ -266,20 +266,21 @@ What's more convenient for you?","您已上传 {count} 件商品。接下来，�
 ¿Qué te resulta más cómodo?"
 multi_items_not_supported,Сейчас бот поддерживает генерацию только по одной вещи за раз. Сценарий для нескольких вещей скоро появится.,"Currently, the bot only supports generating one item at a time. A script for multiple items will be available soon.",目前，该机器人一次仅支持生成一个物品。支持生成多个物品的脚本即将推出。,"फिलहाल, यह बॉट एक बार में केवल एक ही आइटम जनरेट कर सकता है। एक से अधिक आइटम जनरेट करने के लिए स्क्रिप्ट जल्द ही उपलब्ध होगी।","Actualmente, el bot solo permite generar un elemento a la vez. Próximamente estará disponible un script para varios elementos."
 no_credits,Недостаточно кредитов для генерации. Пополните баланс через /buy.,Not enough credits to generate. Top up your balance via /buy.,积分不足，无法生成奖励。请通过 /buy 命令充值。,पर्याप्त क्रेडिट नहीं हैं। /buy के माध्यम से अपना बैलेंस टॉप अप करें।,No hay suficientes créditos para generar. Recarga tu saldo con /buy.
-no_more_photos,Больше нет фотографий в очереди.,There are no more photos in the queue.,队列中已无照片可供拍摄。,अब कतार में और तस्वीरें नहीं ली जा सकतीं।,No hay más fotos en la cola.
-payment_method_desc,Выберите удобный для вас способ пополнения баланса:,Choose a convenient way to top up your balance:,选择一种便捷的充值方式：,अपने बैलेंस में राशि जमा करने के लिए एक सुविधाजनक तरीका चुनें:,Elige una forma conveniente de recargar tu saldo:
+no_more_photos,Больше нет фотографий в очереди.,There are no more photos in the queue.,队列中已无照片。,अब कतार में और तस्वीरें नहीं ली जा सकतीं।,No hay más fotos en la cola.
+payment_method_desc,Выберите удобный для вас способ пополнения баланса:,Choose a convenient way to top up your balance:,选择一种便捷的充值方式：,अपना बैलेंस टॉप अप करने के लिए एक सुविधाजनक तरीका चुनें:,Elige una forma conveniente de recargar tu saldo:
 payment_method_title,💳 <b>Выберите способ оплаты</b>,💳 <b>Select a payment method</b>,💳 <b>选择付款方式</b>,💳 <b>भुगतान विधि चुनें</b>,💳 <b>Selecciona un método de pago</b>
 payment_ok,"Оплата звёздами прошла успешно.
 ID транзакции: {charge_id}
-Начислено звёзд: {amount}","Payment with stars was successful.
+Начислено звёзд: {amount}","Payment in stars was successful.
 Transaction ID: {charge_id}
-Stars awarded: {amount}","使用星星支付成功。
+Stars awarded: {amount}","星星支付成功。
 
 交易 ID：{charge_id}
 
-获得的星星数量：{amount}","स्टार्स के माध्यम से भुगतान सफल रहा।
+获得的星星数量：{amount}","स्टार्स में भुगतान सफल रहा।
+
 लेनदेन आईडी: {charge_id}
-प्राप्त स्टार्स: {amount}","Pago con estrellas exitoso.
+प्राप्त स्टार्स: {amount}","Pago en estrellas exitoso.
 ID de transacción: {charge_id}
 Estrellas otorgadas: {amount}"
 payment_stars_desc,Оплата через Telegram Stars,Payment via Telegram Stars,通过 Telegram Stars 付款,टेलीग्राम स्टार्स के माध्यम से भुगतान,Pago a través de Telegram Stars
@@ -320,10 +321,10 @@ prompt_upload_flat,"Загрузите фотографию одежды на н
 We recommend cropping the photo so that it only shows the clothing you want the model to wear.","请上传一张服装在纯色背景下的照片。服装可以平铺或悬挂。
 
 我们建议您裁剪照片，使其只显示您希望模特穿着的服装部分。","कपड़ों की एक ऐसी तस्वीर अपलोड करें जिसमें वे किसी सादे बैकग्राउंड के सामने हों। कपड़े लेटे हुए या लटके हुए हो सकते हैं।
-हमारा सुझाव है कि तस्वीर को क्रॉप कर लें ताकि उसमें केवल वही कपड़े दिखाई दें जिन्हें आप मॉडल को पहनाना चाहते हैं।",Sube una foto de la prenda sobre un fondo neutro. La prenda puede estar tumbada o colgada. Recomendamos recortar la foto para que solo muestre la ropa que quieres que lleve la modelo.
+हमारा सुझाव है कि तस्वीर को क्रॉप कर लें ताकि उसमें केवल वही कपड़े दिखाई दें जिन्हें आप मॉडल को पहनाना चाहते हैं।",Sube una foto de la prenda sobre un fondo neutro. La prenda puede estar tumbada o colgada. Recomendamos recortar la foto para que solo se vea la ropa que quieres que lleve la modelo.
 prompt_upload_on_mannequin,"ВАЖНО: На фото не должно быть головы маникена. Рекомендуем
 обрезать фотографию так, чтобы на ней оставалась только одежда, которую хотите
-надеть на модель. ",IMPORTANT: The photo should not include the mannequin's head. We recommend cropping the photo so that only the clothing you want to put on the model appears.,重要提示：照片中不应包含模特的头部。我们建议您裁剪照片，只保留您想穿在模特身上的服装部分。,महत्वपूर्ण: फोटो में पुतले का सिर नहीं दिखना चाहिए। हमारा सुझाव है कि फोटो को इस प्रकार क्रॉप करें कि केवल वही कपड़े दिखाई दें जिन्हें आप मॉडल को पहनाना चाहते हैं।,IMPORTANTE: La foto no debe incluir la cabeza del maniquí. Recomendamos recortarla para que solo aparezca la ropa que se le va a poner al modelo.
+надеть на модель. ",IMPORTANT: The photo should not include the mannequin's head. We recommend cropping the photo so that it only shows the clothing you want to put on the model.,重要提示：照片中不应包含模特的头部。我们建议您裁剪照片，使其仅显示您想穿在模特身上的服装。,महत्वपूर्ण: फोटो में पुतले का सिर नहीं दिखना चाहिए। हमारा सुझाव है कि फोटो को इस तरह क्रॉप करें कि उसमें केवल वही कपड़े दिखाई दें जो आप मॉडल को पहनाना चाहते हैं।,IMPORTANTE: La foto no debe incluir la cabeza del maniquí. Recomendamos recortarla para que solo muestre la ropa que le quieres poner a la modelo.
 prompt_upload_on_person,"ВАЖНО: На фото не должно быть лиц и голов людей. Рекомендуем
 обрезать фотографию так, чтобы на ней оставалась только одежда, которую хотите
 надеть на модель. ",IMPORTANT: The photo should not contain people's faces or heads. We recommend cropping the photo so that it only shows the clothing you want the model to wear.,重要提示：照片中不应包含人脸或头部。我们建议您裁剪照片，使其仅显示您希望模特穿着的服装。,महत्वपूर्ण: फोटो में लोगों के चेहरे या सिर नहीं होने चाहिए। हमारा सुझाव है कि फोटो को इस तरह क्रॉप करें कि उसमें केवल वही कपड़े दिखाई दें जो आप मॉडल को पहनाना चाहते हैं।,IMPORTANTE: La foto no debe mostrar rostros ni cabezas de personas. Recomendamos recortarla para que solo muestre la ropa que quieres que use la modelo.
@@ -445,7 +446,7 @@ photos:
 
 - 米色背景 + 深色头发","मॉडल के लिए एक या अधिक बालों के रंग चुनें।
 
-महत्वपूर्ण: कई सेक्शन में एक से अधिक विकल्प चुनने से फ़ोटो की संख्या कई गुना बढ़ जाती है।
+महत्वपूर्ण: एक से अधिक सेक्शन में एक से अधिक विकल्प चुनने से फ़ोटो की संख्या कई गुना बढ़ जाती है।
 उदाहरण के लिए, यदि आपने सफ़ेद और बेज रंग की पृष्ठभूमि + हल्के और गहरे रंग के बाल चुने हैं, तो 4 फ़ोटो बनेंगी:
 - सफ़ेद पृष्ठभूमि + हल्के बाल
 - सफ़ेद पृष्ठभूमि + गहरे बाल
@@ -516,7 +517,7 @@ Aceptamos fotos de tu ropa:
 1. En una persona
 2. En un maniquí
 3. Sobre un fondo neutro o colgada en una percha."
-style_need_one,"Выберите хотя бы один стиль, чтобы продолжить.",Please select at least one style to continue.,请至少选择一种样式继续。,आगे बढ़ने के लिए कृपया कम से कम एक शैली का चयन करें।,Seleccione al menos un estilo para continuar.
+style_need_one,"Выберите хотя бы один стиль, чтобы продолжить.",Please select at least one style to continue.,请至少选择一种样式继续。,कृपया जारी रखने के लिए कम से कम एक शैली का चयन करें।,Seleccione al menos un estilo para continuar.
 style_selected_header,Выбранные стили:,Selected styles:,精选款式：,चयनित शैलियाँ:,Estilos seleccionados:
 task_queued,"Задача поставлена в очередь (ID: {task_id}).
 Идёт обработка на сервере нейросети.","The task has been queued (ID: {task_id}).
@@ -525,7 +526,7 @@ Processing is in progress on the neural network server.","任务已加入队列�
 神经网络服务器正在处理该任务。","कार्य को कतार में डाल दिया गया है (आईडी: {task_id})।
 न्यूरल नेटवर्क सर्वर पर प्रोसेसिंग जारी है।",La tarea se ha puesto en cola (ID: {task_id}). El procesamiento está en curso en el servidor de red neuronal.
 unknown_lang,Неизвестный язык. Попробуйте ещё раз.,Unknown language. Please try again.,语言未知。请重试。,यह भाषा अज्ञात है। कृपया पुनः प्रयास करें।,Idioma desconocido. Inténtalo de nuevo.
-upload_doc_only,"Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия).",Please send the photo as a document in original quality (uncompressed).,请以文档形式发送原始质量（未压缩）的照片。,कृपया फोटो को मूल गुणवत्ता (बिना संपीड़ित किए) में दस्तावेज़ के रूप में भेजें।,Por favor envíe la foto como documento en calidad original (sin comprimir).
+upload_doc_only,"Пожалуйста, отправьте фото как документ в оригинальном качестве (без сжатия).",Please send the photo as a document in original quality (uncompressed).,请以原始质量（未压缩）的文档形式发送照片。,कृपया फोटो को मूल गुणवत्ता (बिना संपीड़ित किए) में दस्तावेज़ के रूप में भेजें।,Por favor envíe la foto como documento en calidad original (sin comprimir).
 upload_doc_wrong_type,"Это не похоже на изображение. Пожалуйста, отправьте фотографию одежды как документ (файл).",This doesn't look like the image. Please send a photo of the garment as a document (file).,这件衣服看起来和图片不符。请将衣服的照片以文档（文件）的形式发送给我。,यह तस्वीर से मेल नहीं खाता। कृपया कपड़े की एक तस्वीर दस्तावेज़ (फ़ाइल) के रूप में भेजें।,"Esto no se parece a la imagen. Por favor, envíe una foto de la prenda como documento (archivo)."
 upload_intro_full,"<b> Загрузите фотографии вещей, которые хотите надеть на модель. </b>
 Шаг 1: Изучите рекомендации.
@@ -545,16 +546,16 @@ upload_intro_full,"<b> Загрузите фотографии вещей, ко�
 Шаг 3: Загрузите фотографию одной или нескольких вещей
 Важно: Каждое загруженное фото считается как отдельная вещь.","<b>Upload photos of the items you want the model to wear.</b>
 Step 1: Review the guidelines.
-- Crop the photo: Leave as little excess as possible besides the clothes you want.
+- Crop the photo: Leave as little excess as possible besides the clothing you want.
 - The photo should not contain faces or heads of people or mannequins.
 - The higher the photo resolution, the better the result.
-- We do not recommend using it for displaying complex metal hardware.
-Displaying clothes with zippers may require more attempts.
+- We do not recommend using it to display complex metal hardware.
+Displaying clothing with zippers may require more attempts.
 
 Step 2: Select the type of photo you are uploading and click the button:
-- Photo of clothes: The clothes are lying down or hanging on a hanger.
-- Photo of a person: The clothes are being worn by a person, cropped to remove the face and minimize unnecessary elements.
-- Photo of a mannequin: The clothes are being worn on a mannequin, the photo does not include the mannequin's head and contains as little excess as possible.
+- Photo of clothing: The clothing is lying down or hanging on a hanger.
+- Photo of a person: The clothing is being worn by a person, cropped to remove the face and minimize unnecessary elements.
+- Photo of a mannequin: The clothing is being worn on a mannequin, the photo does not include the mannequin's head and contains as little excess as possible.
 
 Step 3: Upload a photo of one or more items.
 Important: Each uploaded photo is counted as a separate item.","<b>上传您希望模特穿着的服装照片。</b>
@@ -567,7 +568,7 @@ Important: Each uploaded photo is counted as a separate item.","<b>上传您希�
 
 - 照片分辨率越高，效果越好。
 
-- 我们不建议用于展示复杂的金属配件。
+- 我们不建议使用此方法展示复杂的金属配件。
 
 展示带有拉链的服装可能需要更多尝试。
 
@@ -584,7 +585,7 @@ Important: Each uploaded photo is counted as a separate item.","<b>上传您希�
 重要提示：每张上传的照片都算作一个单独的项目。","<b>मॉडल को पहनाए जाने वाले कपड़ों की तस्वीरें अपलोड करें।</b>
 चरण 1: दिशा-निर्देशों की समीक्षा करें।
 
-- फ़ोटो क्रॉप करें: कपड़ों के अलावा जितना हो सके कम अतिरिक्त भाग छोड़ें।
+- फ़ोटो क्रॉप करें: इच्छित कपड़ों के अलावा जितना हो सके कम अतिरिक्त भाग छोड़ें।
 
 - फ़ोटो में किसी व्यक्ति या पुतले का चेहरा या सिर नहीं होना चाहिए।
 
@@ -595,7 +596,7 @@ Important: Each uploaded photo is counted as a separate item.","<b>上传您希�
 ज़िपर वाले कपड़ों को प्रदर्शित करने के लिए अधिक प्रयास करने पड़ सकते हैं।
 
 चरण 2: अपलोड की जाने वाली फ़ोटो का प्रकार चुनें और बटन पर क्लिक करें:
-- कपड़ों की फ़ोटो: कपड़े रखे हुए हैं या हैंगर पर लटके हुए हैं।
+- कपड़ों की फ़ोटो: कपड़े लेटे हुए हैं या हैंगर पर लटके हुए हैं।
 
 - व्यक्ति की फ़ोटो: कपड़े किसी व्यक्ति द्वारा पहने हुए हैं, फ़ोटो को क्रॉप करके चेहरा हटा दिया गया है और अनावश्यक तत्वों को कम किया गया है।
 
@@ -606,13 +607,13 @@ Important: Each uploaded photo is counted as a separate item.","<b>上传您希�
 महत्वपूर्ण: अपलोड की गई प्रत्येक तस्वीर को एक अलग आइटम के रूप में गिना जाता है।","Sube fotos de las prendas que quieres que la modelo use.
 Paso 1: Revisa las instrucciones.
 - Recorta la foto: Deja la menor cantidad posible de elementos sobrantes, además de la ropa que quieres.
-- La foto no debe contener rostros ni cabezas de personas ni maniquíes.
+- La foto no debe mostrar rostros ni cabezas de personas ni maniquíes.
 - Cuanto mayor sea la resolución de la foto, mejor será el resultado.
 - No recomendamos usarla para mostrar piezas metálicas complejas.
 Mostrar ropa con cremalleras puede requerir más intentos.
 
 Paso 2: Selecciona el tipo de foto que vas a subir y haz clic en el botón:
-- Foto de ropa: La ropa está tumbada o colgada en una percha.
+- Foto de la ropa: La ropa está tumbada o colgada en una percha.
 - Foto de una persona: La ropa está siendo usada por una persona, recortada para eliminar el rostro y minimizar los elementos innecesarios.
 - Foto de un maniquí: La ropa está siendo usada por un maniquí; la foto no incluye la cabeza del maniquí y contiene la menor cantidad de elementos sobrantes posible.
 
@@ -705,3 +706,6 @@ regenerating,🔄 Перегенерация...,🔄 Regeneration...,🔄 再生
 retrying_download,🔄 Повторная загрузка...,🔄 Reloading...,🔄 正在加载...,🔄 रीलोड हो रहा है...,🔄Recargando...
 btn_language,🌐 Язык,🌐 Language,🌐 语言,🌐 भाषा,🌐 Idioma
 keyboard_updated,Кнопки меню обновлены ✓,Menu buttons have been updated ✓,菜单按钮已更新 ✓,मेनू बटन अपडेट कर दिए गए हैं ✓,Se han actualizado los botones del menú ✓
+btn_retry_upload,🔄 Повторить,🔄 Repeat,🔄 重复,🔄 दोहराएँ,🔄 Repetir
+upload_failed,❌ Не удалось загрузить изображение. Проверьте соединение и попробуйте снова.,❌ Failed to load image. Check your connection and try again.,❌ 图片加载失败。请检查您的网络连接并重试。,❌ छवि लोड करने में विफल। कृपया अपना कनेक्शन जांचें और पुनः प्रयास करें।,❌ No se pudo cargar la imagen. Revisa tu conexión y vuelve a intentarlo.
+retrying_upload,🔄 Повторная загрузка...,🔄 Reloading...,🔄 正在加载...,🔄 रीलोड हो रहा है...,🔄Recargando...
