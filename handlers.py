@@ -2043,14 +2043,14 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await state.update_data(gender=gender)
 
         data = await state.get_data()
-        # по умолчанию считаем, что выбран вариант "Любой"
+        # по умолчанию пустое множество (без галочки), при генерации пустое = "любой"
         if data.get("settings_mode") == "per_item":
             idx = int(data.get("per_item_index") or 0)
             pis = list(data.get("per_item_settings") or [])
             cur = pis[idx] if idx < len(pis) else {}
-            selected_hairs = set(cur.get("hair_options") or {"any"})
+            selected_hairs = set(cur.get("hair_options") or [])
         else:
-            selected_hairs = set(data.get("hair_options") or {"any"})
+            selected_hairs = set(data.get("hair_options") or [])
 
         kb = build_hair_keyboard(lang, selected_hairs)
 
@@ -2082,9 +2082,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             idx = int(data.get("per_item_index") or 0)
             pis = list(data.get("per_item_settings") or [])
             cur = pis[idx] if idx < len(pis) else {}
-            selected = set(cur.get("hair_options") or {"any"})
+            selected = set(cur.get("hair_options") or [])
         else:
-            selected = set(data.get("hair_options") or {"any"})
+            selected = set(data.get("hair_options") or [])
 
         kb = build_hair_keyboard(lang, selected)
 
@@ -2188,11 +2188,12 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # --- Next: валидируем и идём к возрасту ---
         if action == "next":
+            # Если ничего не выбрано - показываем предупреждение
             if not selected:
                 await q.answer(T(lang, "hair_need_one"), show_alert=True)
                 return
 
-            # effective список для логики:
+            # Если выбран "любой", используем "any"
             if selected == {"any"}:
                 hair_main = "any"
                 hair_options = ["any"]
@@ -3035,13 +3036,23 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 )
                 cloth_urls.append(cloth_url)
             except Exception as e:
-                await state.clear()
-                err_text = T(lang, "generation_failed")
+                logger.error(f"Seedream upload_image_bytes failed: {repr(e)}")
+                # Save state for retry
+                await state.update_data(
+                    upload_failed=True,
+                    last_error=str(e),
+                )
+                err_text = T(lang, "upload_failed")
+                kb = InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text=T(lang, "btn_retry_upload"), callback_data="gen:retry_upload")],
+                        [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
+                    ]
+                )
                 try:
-                    await q.message.edit_text(err_text)
+                    await q.message.edit_text(err_text, reply_markup=kb)
                 except Exception:
-                    await q.message.answer(err_text)
-                logger.exception("Seedream upload_image_bytes failed", exc_info=e)
+                    await q.message.answer(err_text, reply_markup=kb)
                 return
 
         # подготовим параметры и план
@@ -3632,6 +3643,28 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # Show first photo with approval buttons
         await _show_photo_for_review(q.message, state, lang, db)
+
+
+    # --- Retry upload handler ---
+    @r.callback_query(F.data == "gen:retry_upload")
+    async def on_gen_retry_upload(q: CallbackQuery, state: FSMContext, bot: Bot):
+        """Handle retry upload request - retry the generation from the beginning."""
+        lang = await get_lang(q, db)
+        await q.answer()
+
+        # Clear the error flag and retry
+        await state.update_data(upload_failed=False, last_error=None)
+
+        try:
+            await q.message.edit_text(T(lang, "retrying_upload"))
+        except Exception:
+            await q.message.answer(T(lang, "retrying_upload"))
+
+        # Re-trigger the confirmation flow by simulating the callback
+        # The state should still have all the generation parameters
+        from aiogram.types import CallbackQuery as CQ
+        # Create a fake callback to re-trigger on_gen_confirm
+        await on_gen_confirm(q, state, bot)
 
 
     # --- Regenerate handler ---
