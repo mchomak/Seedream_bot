@@ -44,7 +44,7 @@ import asyncio
 import json
 from io import BytesIO
 # Import helper functions from modular structure
-from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands, reload_translations, I18N_PATH, get_i18n
+from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands, reload_translations, I18N_PATH, get_i18n, invalidate_lang_cache
 from handlers_func.db_helpers import (
     Profile,
     get_profile,
@@ -651,6 +651,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 is_premium=getattr(q.from_user, "is_premium", False),
                 is_bot=q.from_user.is_bot,
             )
+
+        # Сбросить кэш языка
+        invalidate_lang_cache(q.from_user.id)
 
         # Acknowledge
         await q.answer("OK")
@@ -1316,6 +1319,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             # Get dynamic values for start message
             free_gens = await get_free_generations_limit(s)
             price_per_gen = await get_single_credit_price_rub(s)
+
+        # Сбросить кэш языка
+        invalidate_lang_cache(q.from_user.id)
 
         # Acknowledge
         await q.answer("OK")

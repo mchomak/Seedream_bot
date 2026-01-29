@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import time
 from typing import Optional
 
 from aiogram import Bot
@@ -19,6 +20,11 @@ from localization import Localizer, LocalizerConfig, normalize_lang
 # Рекомендация: хранить в репо как locales/phrases.csv
 I18N_PATH = os.getenv("I18N_PATH", "locales/phrases.csv")
 DEFAULT_LANG = os.getenv("DEFAULT_LANG", "ru")
+
+# Кэш языка пользователя: {user_id: (lang, timestamp)}
+# TTL = 300 секунд (5 минут)
+_lang_cache: dict[int, tuple[str, float]] = {}
+_LANG_CACHE_TTL = 300  # секунд
 
 # Use a container dict so imports can access updated i18n via i18n_container["instance"]
 i18n_container = {
@@ -84,31 +90,49 @@ def _supported_lang(code: str | None) -> str:
     return normalize_lang(DEFAULT_LANG, "ru")
 
 
+def invalidate_lang_cache(user_id: int) -> None:
+    """Сбросить кэш языка для пользователя (вызывать после смены языка)."""
+    _lang_cache.pop(user_id, None)
+
+
 async def get_lang(event: Message | CallbackQuery, db: Optional[Database] = None) -> str:
     """
     Resolve user language with priority:
-    1) users.lang from DB (if present)
-    2) Telegram UI language_code
-    3) default_lang
+    1) Cache (TTL 5 минут)
+    2) users.lang from DB (if present)
+    3) Telegram UI language_code
+    4) default_lang
     """
-    # 1) DB
-    if db and getattr(event, "from_user", None) is not None:
-        uid = event.from_user.id
+    uid = getattr(event, "from_user", None) and event.from_user.id
+    now = time.time()
+
+    # 1) Проверка кэша
+    if uid and uid in _lang_cache:
+        cached_lang, cached_time = _lang_cache[uid]
+        if now - cached_time < _LANG_CACHE_TTL:
+            return cached_lang
+
+    # 2) DB
+    if db and uid:
         try:
             async with db.session() as s:
                 row = await s.execute(select(User.lang).where(User.user_id == uid))
                 lang = row.scalar_one_or_none()
                 if lang:
                     result = _supported_lang(lang)
-                    logger.debug(f"get_lang: DB lang={lang} -> {result} for user {uid}")
+                    _lang_cache[uid] = (result, now)
                     return result
         except Exception as e:
             logger.warning(f"get_lang: DB error for user {uid}: {e}")
 
-    # 2) Telegram UI language
+    # 3) Telegram UI language
     tg_code = (getattr(event, "from_user", None) and event.from_user.language_code) or DEFAULT_LANG
     result = _supported_lang(tg_code)
-    logger.debug(f"get_lang: fallback to tg_code={tg_code} -> {result}")
+
+    # Кэшируем результат
+    if uid:
+        _lang_cache[uid] = (result, now)
+
     return result
 
 

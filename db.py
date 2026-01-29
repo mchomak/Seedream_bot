@@ -570,6 +570,9 @@ class Database:
             url,
             echo=False,
             pool_pre_ping=True,
+            pool_size=10,        # базовое количество соединений
+            max_overflow=20,     # дополнительные соединения при нагрузке
+            pool_recycle=3600,   # пересоздавать соединения каждый час
         )
 
         session_factory = async_sessionmaker(
