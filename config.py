@@ -117,6 +117,7 @@ class Settings:
     database_url: str
     redis_url: Optional[str] = None
     seedream_api: Optional[str] = None
+    seedream_proxy: Optional[str] = None  # SOCKS5/HTTP proxy for Seedream API (e.g. socks5://127.0.0.1:1080)
     telegram_admin_ids: tuple[int, ...] = ()  # Telegram user IDs allowed to use admin commands
 
 
@@ -144,6 +145,7 @@ def load_env(env_file: str = ".env") -> Settings:
     database_url = os.getenv("DATABASE_URL").strip()
     redis_url = os.getenv("REDIS_URL")
     seedream_api = os.getenv("SEEDREAM_API")
+    seedream_proxy = os.getenv("SEEDREAM_PROXY")  # e.g. socks5://127.0.0.1:1080
 
     # Parse TELEGRAM_ADMIN_IDS (comma-separated list of Telegram user IDs)
     admin_ids_str = os.getenv("TELEGRAM_ADMIN_IDS", "").strip()
@@ -181,6 +183,7 @@ def load_env(env_file: str = ".env") -> Settings:
         database_url=database_url,
         redis_url=redis_url,
         seedream_api=seedream_api,
+        seedream_proxy=seedream_proxy,
         telegram_admin_ids=telegram_admin_ids,
     )
 

@@ -52,6 +52,7 @@ class SeedreamService:
         timeout: int = 60,
         max_retries: int = 3,
         backoff_factor: float = 1.5,
+        proxy: str | None = None,
     ):
         self.api_key = api_key
         self.timeout = timeout
@@ -65,6 +66,14 @@ class SeedreamService:
                 "Accept": "application/json",
             }
         )
+
+        # Настройка прокси (SOCKS5/HTTP)
+        if proxy:
+            self.session.proxies = {
+                "http": proxy,
+                "https": proxy,
+            }
+            logger.info(f"[SeedreamService] Using proxy: {proxy}")
 
     # -------------------------------------------------------------------------
     # Низкоуровневые методы (HTTP)

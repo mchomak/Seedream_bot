@@ -46,7 +46,8 @@ async def main() -> None:
     dp = Dispatcher(storage=storage)
     seedream = SeedreamService(
         api_key=settings.seedream_api,
-        timeout=60
+        timeout=60,
+        proxy=settings.seedream_proxy,
     )
 
     # 5) Optional Telegram alerts dispatcher for CRITICAL logs
