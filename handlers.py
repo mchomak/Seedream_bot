@@ -3007,8 +3007,11 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         data = await state.get_data()
 
+        # Проверяем, есть ли готовые URL (из redo with new settings)
+        redo_source_urls = data.get("redo_source_urls")
+
         cloth_file_ids = list(data.get("cloth_file_ids") or [])
-        if not cloth_file_ids:
+        if not cloth_file_ids and not redo_source_urls:
             await q.message.answer(T(lang, "generation_failed"))
             await state.clear()
             return
@@ -3016,50 +3019,54 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         upload_type = data.get("upload_type") or "flat"
         settings_mode = data.get("settings_mode")
 
-        # загрузим все изображения и получим их URLs
+        # Если есть готовые URL из redo - используем их напрямую
         cloth_urls: list[str] = []
-        for tg_file_id in cloth_file_ids:
-            file_buf = BytesIO()
-            try:
-                await bot.download(file=tg_file_id, destination=file_buf)
-                file_buf.seek(0)
-                cloth_bytes = file_buf.read()
-            except Exception as e:
-                await state.clear()
-                err_text = T(lang, "generation_failed")
+        if redo_source_urls:
+            cloth_urls = list(redo_source_urls)
+        else:
+            # Загружаем и отправляем файлы в Seedream
+            for tg_file_id in cloth_file_ids:
+                file_buf = BytesIO()
                 try:
-                    await q.message.edit_text(err_text)
-                except Exception:
-                    await q.message.answer(err_text)
-                logger.exception("Telegram file download failed", exc_info=e)
-                return
+                    await bot.download(file=tg_file_id, destination=file_buf)
+                    file_buf.seek(0)
+                    cloth_bytes = file_buf.read()
+                except Exception as e:
+                    await state.clear()
+                    err_text = T(lang, "generation_failed")
+                    try:
+                        await q.message.edit_text(err_text)
+                    except Exception:
+                        await q.message.answer(err_text)
+                    logger.exception("Telegram file download failed", exc_info=e)
+                    return
 
-            try:
-                cloth_url = await asyncio.to_thread(
-                    seedream.upload_image_bytes,
-                    cloth_bytes,
-                    f"cloth_{tg_file_id}.jpg",
-                )
-                cloth_urls.append(cloth_url)
-            except Exception as e:
-                logger.error(f"Seedream upload_image_bytes failed: {repr(e)}")
-                # Save state for retry
-                await state.update_data(
-                    upload_failed=True,
-                    last_error=str(e),
-                )
-                err_text = T(lang, "upload_failed")
-                kb = InlineKeyboardMarkup(
-                    inline_keyboard=[
-                        [InlineKeyboardButton(text=T(lang, "btn_retry_upload"), callback_data="gen:retry_upload")],
-                        [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
-                    ]
-                )
                 try:
-                    await q.message.edit_text(err_text, reply_markup=kb)
-                except Exception:
-                    await q.message.answer(err_text, reply_markup=kb)
-                return
+                    cloth_url = await asyncio.to_thread(
+                        seedream.upload_image_bytes,
+                        cloth_bytes,
+                        f"cloth_{tg_file_id}.jpg",
+                    )
+                    cloth_urls.append(cloth_url)
+                except Exception as e:
+                    logger.error(f"Seedream upload_image_bytes failed: {repr(e)}")
+                    # Save state for retry
+                    await state.update_data(
+                        upload_failed=True,
+                        last_error=str(e),
+                    )
+                    err_text = T(lang, "upload_failed")
+                    kb = InlineKeyboardMarkup(
+                        inline_keyboard=[
+                            [InlineKeyboardButton(text=T(lang, "btn_retry_upload"), callback_data="gen:retry_upload")],
+                            [InlineKeyboardButton(text=T(lang, "btn_back"), callback_data="start:back")],
+                        ]
+                    )
+                    try:
+                        await q.message.edit_text(err_text, reply_markup=kb)
+                    except Exception:
+                        await q.message.answer(err_text, reply_markup=kb)
+                    return
 
         # подготовим параметры и план
         if settings_mode == "per_item":
@@ -4420,57 +4427,60 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         action = q.data.split(":")[-1]
 
         if action == "new":
-            # Return to design stage with option to start fresh generation
+            # Redo with new settings - skip photo upload, go directly to background selection
             data = await state.get_data()
             photos = data.get("review_photos", [])
 
-            if photos:
-                # Store the rejected photo info for potential replacement later
-                photo = photos[0]
-                generation_id = photo.get("generation_id")
+            if not photos:
+                await q.answer("No photo to redo", show_alert=True)
+                return
 
-                # Get original cloth file IDs if available
-                cloth_file_ids = data.get("cloth_file_ids", [])
+            photo = photos[0]
+            generation_id = photo.get("generation_id")
 
-                # Clear state and restart generation flow
-                await state.clear()
+            if not generation_id:
+                await q.answer("Cannot retrieve generation parameters", show_alert=True)
+                return
 
-                # If we have the original cloth files, restore them
-                if cloth_file_ids:
-                    await state.update_data(cloth_file_ids=cloth_file_ids, num_items=len(cloth_file_ids))
+            # Get original generation to retrieve source image URLs
+            async with db.session() as s:
+                original_gen = (
+                    await s.execute(select(Generation).where(Generation.id == generation_id))
+                ).scalar_one_or_none()
 
-                # Show upload type selection to restart the flow
-                await q.message.answer(
-                    T(lang, "upload_type_prompt"),
-                    reply_markup=InlineKeyboardMarkup(
-                        inline_keyboard=[
-                            [
-                                InlineKeyboardButton(
-                                    text=T(lang, "btn_flat"),
-                                    callback_data="gen:type:flat"
-                                )
-                            ],
-                            [
-                                InlineKeyboardButton(
-                                    text=T(lang, "btn_model"),
-                                    callback_data="gen:type:model"
-                                )
-                            ],
-                            [
-                                InlineKeyboardButton(
-                                    text=T(lang, "btn_back"),
-                                    callback_data="gen:back_to_start"
-                                )
-                            ],
-                        ]
-                    )
-                )
-                await state.set_state(GenerationFlow.selecting_upload_type)
-                await q.answer()
-            else:
-                await state.clear()
-                await q.message.answer(T(lang, "start_generation"))
-                await q.answer()
+                if not original_gen or not original_gen.source_image_urls:
+                    await q.answer("Original generation not found", show_alert=True)
+                    return
+
+                source_urls = original_gen.source_image_urls
+
+            # Clear state and set up for new generation with existing image
+            await state.clear()
+
+            # Store source URLs directly (skip upload step later)
+            await state.update_data(
+                redo_source_urls=source_urls,
+                settings_mode="all",
+                num_items=1,
+            )
+
+            # Show background selection (same as normal flow for 1 item)
+            intro_text = T(lang, "settings_intro_single", count=1)
+            base_text = T(lang, "background_select_single")
+            full_text = f"{intro_text}\n\n{base_text}"
+
+            selected_backgrounds: set[str] = set()
+            kb = build_background_keyboard(lang, selected_backgrounds)
+
+            sent = await q.message.answer(full_text, reply_markup=kb)
+
+            await state.update_data(
+                generate_prompt_msg_id=sent.message_id,
+                generate_chat_id=sent.chat.id,
+                backgrounds=list(selected_backgrounds),
+            )
+            await state.set_state(GenerationFlow.choosing_background)
+            await q.answer()
 
         elif action == "same":
             # Redo with same settings
