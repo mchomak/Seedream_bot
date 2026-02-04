@@ -8,8 +8,8 @@ Usage:
 
 import asyncio
 import getpass
-from db import Database, AdminUser
-from config import load_env
+from utils.db import Database, AdminUser
+from utils.config import load_env
 import bcrypt
 
 

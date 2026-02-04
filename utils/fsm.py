@@ -178,7 +178,7 @@ class FrozenUserGuard(BaseMiddleware):
     async def __call__(self, handler, event, data: dict):
         from aiogram.types import Message, CallbackQuery
         from sqlalchemy import select
-        from db import User
+        from utils.db import User
         from handlers_func.i18n_helpers import get_i18n
 
         user_id = None

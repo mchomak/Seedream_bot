@@ -7,8 +7,8 @@ from typing import Optional, Any, List
 from sqlalchemy import select, func, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import User, Transaction, TransactionStatus, Generation, GenerationStatus, ScenarioPrice, SystemSetting, TariffPackage, create_generation
-from config import GEN_SCENARIO_PRICES
+from utils.db import User, Transaction, TransactionStatus, Generation, GenerationStatus, ScenarioPrice, SystemSetting, TariffPackage, create_generation
+from utils.config import GEN_SCENARIO_PRICES
 
 
 # ========== System Settings Helpers ==========

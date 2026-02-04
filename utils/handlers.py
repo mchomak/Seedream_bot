@@ -21,7 +21,7 @@ from loguru import logger
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fsm import AnyInput
-from db import (
+from utils.db import (
     Database,
     User,
     Transaction,
@@ -34,12 +34,12 @@ from db import (
     upsert_user_basic,
     record_transaction,
 )
-from localization import Localizer
+from utils.localization import Localizer
 from yookassa_service import YooKassaService
 from fsm import *
-from seedream_service import SeedreamService
+from utils.seedream_service import SeedreamService
 from yookassa_service import YooKassaService
-from config import *
+from utils.config import *
 import asyncio
 import json
 from io import BytesIO
@@ -1883,9 +1883,11 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         from fsm import GenerationFlow
 
+        # Ранний ответ для мгновенного отклика UI
+        await q.answer()
+
         current_state = await state.get_state()
         if current_state != GenerationFlow.choosing_background.state:
-            await q.answer()
             return
 
         lang = await get_lang(q, db)
@@ -2021,9 +2023,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         from fsm import GenerationFlow
 
+        await q.answer()
+
         current_state = await state.get_state()
         if current_state != GenerationFlow.choosing_gender.state:
-            await q.answer()
             return
 
         lang = await get_lang(q, db)
@@ -2125,9 +2128,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         from fsm import GenerationFlow
 
+        await q.answer()
+
         current = await state.get_state()
         if current != GenerationFlow.choosing_hair.state:
-            await q.answer()
             return
 
         lang = await get_lang(q, db)
@@ -2278,15 +2282,15 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     async def on_gen_choose_age(q: CallbackQuery, state: FSMContext):
         from fsm import GenerationFlow
 
+        await q.answer()
+
         current = await state.get_state()
         if current != GenerationFlow.choosing_age.state:
-            await q.answer()
             return
 
         lang = await get_lang(q, db)
         _, _, age = q.data.partition("gen:age:")
         if age not in ("young", "senior", "child", "teen"):
-            await q.answer()
             return
 
         data0 = await state.get_data()
@@ -2454,9 +2458,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         from fsm import GenerationFlow
 
+        await q.answer()
+
         current = await state.get_state()
         if current != GenerationFlow.choosing_style.state:
-            await q.answer()
             return
 
         lang = await get_lang(q, db)
@@ -2568,9 +2573,10 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     async def on_gen_choose_aspect(q: CallbackQuery, state: FSMContext):
         from fsm import GenerationFlow
 
+        await q.answer()
+
         current = await state.get_state()
         if current != GenerationFlow.choosing_aspect.state:
-            await q.answer()
             return
 
         lang = await get_lang(q, db)
@@ -2986,7 +2992,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         Ошибка по одной комбинации НЕ ломает остальные.
         """
         from fsm import GenerationFlow
-        from db import GeneratedImage, ImageRole  # локальный импорт
+        from utils.db import GeneratedImage, ImageRole  # локальный импорт
 
         current = await state.get_state()
         if current != GenerationFlow.confirming.state:
@@ -4734,7 +4740,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 "style": photo.get("style"),
                 "aspect": photo.get("aspect"),
             }
-            await state.update_data(review_photos=photos)
+            await state.update_data(review_photos=photos, current_photo_index=0)
 
             # Return to review state and show the new photo
             await state.set_state(GenerationFlow.reviewing_photos)
