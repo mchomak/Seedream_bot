@@ -12,8 +12,8 @@ from aiogram.types import Message, CallbackQuery, BotCommand
 from loguru import logger
 from sqlalchemy import select
 
-from db import Database, User
-from localization import Localizer, LocalizerConfig, normalize_lang
+from utils.db import Database, User
+from utils.localization import Localizer, LocalizerConfig, normalize_lang
 
 
 # Путь до локализации (экспорт из Google Sheets)

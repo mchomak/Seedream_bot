@@ -7,19 +7,19 @@ import contextlib
 from aiogram import Bot, Dispatcher
 from loguru import logger
 from aiogram.client.default import DefaultBotProperties
-from config import load_env, get_runtime_env, Settings
-from db import Database
-from fsm import create_fsm_storage
+from utils.config import load_env, get_runtime_env, Settings
+from utils.db import Database
+from utils.fsm import create_fsm_storage
 from handlers_func import install_bot_commands
-from handlers import build_router
-from setup_redis import build_fsm_diag_router
-from setup_log import (
+from utils.handlers import build_router
+from utils.setup_redis import build_fsm_diag_router
+from utils.setup_log import (
     setup_logging,
     report_exception,
 )
-from seedream_service import SeedreamService
+from utils.seedream_service import SeedreamService
 # app.py (или main.py)
-from localization import Localizer, LocalizerConfig
+from utils.localization import Localizer, LocalizerConfig
 
 
 async def main() -> None:

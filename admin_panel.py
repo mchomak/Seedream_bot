@@ -27,7 +27,7 @@ from aiogram.client.default import DefaultBotProperties
 from sqlalchemy import select, func, and_, or_, desc, case, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import (
+from utils.db import (
     Database,
     User,
     Transaction,
@@ -44,7 +44,7 @@ from db import (
     BroadcastMessage,
     Backup,
 )
-from config import load_env, GEN_SCENARIO_PRICES
+from utils.config import load_env, GEN_SCENARIO_PRICES
 # http://localhost:8001/admin/login
 
 # Initialize FastAPI app
