@@ -7,6 +7,10 @@ import contextlib
 from aiogram import Bot, Dispatcher
 from loguru import logger
 from aiogram.client.default import DefaultBotProperties
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils.config import load_env, get_runtime_env, Settings
 from utils.db import Database
 from utils.fsm import create_fsm_storage

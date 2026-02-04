@@ -26,13 +26,15 @@ from aiogram.client.default import DefaultBotProperties
 
 from sqlalchemy import select, func, and_, or_, desc, case, extract
 from sqlalchemy.ext.asyncio import AsyncSession
+import sys
+import os
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils.db import (
     Database,
     User,
     Transaction,
     Generation,
-    GeneratedImage,
     AdminUser,
     AdminActionLog,
     TransactionStatus,

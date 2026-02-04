@@ -6,8 +6,11 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 from redis.asyncio import Redis
+import sys
+import os
 
-from fsm import (
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from utils.fsm import (
     expect_any,
     set_waiting_payment,
     cancel_waiting_payment,
