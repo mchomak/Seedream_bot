@@ -1,6 +1,5 @@
 # handlers.py
 from __future__ import annotations
-from aiogram.types import BufferedInputFile
 from datetime import datetime, timezone
 from typing import Optional, Any
 from decimal import Decimal
@@ -16,15 +15,24 @@ from aiogram.types import (
     CallbackQuery,
     BotCommand,
     BotCommandScopeChat,
+    BufferedInputFile
 )
 from loguru import logger
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from fsm import AnyInput
+import asyncio
+import json
+from datetime import timedelta
+from io import BytesIO
+import json
+import sys
+import os
+import csv
+from datetime import datetime
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils.db import (
     Database,
     User,
-    Transaction,
     TransactionKind,
     TransactionStatus,
     Generation,
@@ -35,18 +43,14 @@ from utils.db import (
     record_transaction,
 )
 from utils.localization import Localizer
-from yookassa_service import YooKassaService
-from fsm import *
+from utils.yookassa_service import YooKassaService
+from utils.fsm import *
 from utils.seedream_service import SeedreamService
-from yookassa_service import YooKassaService
 from utils.config import *
-import asyncio
-import json
-from io import BytesIO
+
 # Import helper functions from modular structure
-from handlers_func.i18n_helpers import get_lang, T, T_item, install_bot_commands, reload_translations, I18N_PATH, get_i18n, invalidate_lang_cache
+from handlers_func.i18n_helpers import get_lang, T, reload_translations, I18N_PATH, get_i18n, invalidate_lang_cache
 from handlers_func.db_helpers import (
-    Profile,
     get_profile,
     ensure_credits_and_create_generation,
     get_scenario_price,
@@ -273,8 +277,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "start:generate")
     async def on_start_generate(q: CallbackQuery, state: FSMContext):
         """Handle 'Start' button from welcome message - go directly to upload intro."""
-        from fsm import GenerationFlow
-
         lang = await get_lang(q, db)
 
         # Check if user has credits
@@ -413,7 +415,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                             user_groups = raw_groups
                         elif isinstance(raw_groups, str):
                             # Parse string representation of list
-                            import json
                             try:
                                 user_groups = json.loads(raw_groups)
                                 logger.info(f"[A/B] Parsed user_groups from string: {user_groups}")
@@ -678,7 +679,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         page = int(q.data.split(":")[-1])
 
         # Get history from database (last month)
-        from datetime import timedelta
         one_month_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
         async with db.session() as s:
@@ -861,7 +861,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 img_bytes = await asyncio.to_thread(seedream.download_file_bytes, img.storage_url)
 
                 # Send as document
-                from aiogram.types import BufferedInputFile
                 await q.message.answer_document(
                     document=BufferedInputFile(img_bytes, filename=f"generation_{gen_id}_{i + 1}.png"),
                     caption=f"Generation #{gen_id} - Image {i + 1}/{len(images)}"
@@ -1182,8 +1181,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:mode:all      -> единые настройки для всех вещей
         - gen:mode:per_item -> отдельные настройки для каждой вещи (пока заглушка)
         """
-        from fsm import GenerationFlow
-
         lang = await get_lang(query, db)
         data = await state.get_data()
 
@@ -1416,7 +1413,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             return
 
         # Skip intro, go directly to upload type selection
-        from fsm import GenerationFlow
+        
         await state.set_state(GenerationFlow.selecting_upload_type)
 
         kb = InlineKeyboardMarkup(
@@ -1438,7 +1435,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- gen:start: показать рекомендации и выбор типа фото ---
     @r.callback_query(F.data == "gen:start")
     async def on_gen_start(q: CallbackQuery, state: FSMContext):
-        from fsm import GenerationFlow
+        
 
         lang = await get_lang(q, db)
 
@@ -1494,7 +1491,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- выбор типа загружаемой фотографии ---
     @r.callback_query(F.data.startswith("gen:type:"))
     async def on_gen_choose_type(q: CallbackQuery, state: FSMContext):
-        from fsm import GenerationFlow
+        
 
         current = await state.get_state()
         if current != GenerationFlow.selecting_upload_type.state:
@@ -1542,7 +1539,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data == "gen:back_to_types")
     async def on_gen_back_to_types(q: CallbackQuery, state: FSMContext):
-        from fsm import GenerationFlow
+        
 
         lang = await get_lang(q, db)
 
@@ -1627,7 +1624,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         Если ждём документ, но приходит photo — просим юзера отправить как документ.
         Заодно логируем тип сообщения.
         """
-        from fsm import GenerationFlow
+        
 
         current_state = await state.get_state()
         # Логируем тип сообщения, чтобы ты видел в консоли
@@ -1771,7 +1768,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага выбора пола обратно к выбору фона.
         """
-        from fsm import GenerationFlow
+        
 
         lang = await get_lang(q, db)
         data = await state.get_data()
@@ -1819,7 +1816,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага выбора волос назад к выбору пола.
         """
-        from fsm import GenerationFlow
+        
 
         lang = await get_lang(q, db)
         data = await state.get_data()
@@ -1881,7 +1878,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:bg:white|beige|pink|black — тогаем выбранность с галочками
         - gen:bg:next — сохраняем выбор и переходим к выбору пола
         """
-        from fsm import GenerationFlow
+        
 
         # Ранний ответ для мгновенного отклика UI
         await q.answer()
@@ -2021,7 +2018,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - сохраняем gender
         - показываем шаг выбора цвета волос (мультивыбор)
         """
-        from fsm import GenerationFlow
+        
 
         await q.answer()
 
@@ -2083,7 +2080,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага возраста к выбору цвета волос (с сохранённым выбором).
         """
-        from fsm import GenerationFlow
+        
 
         lang = await get_lang(q, db)
         data = await state.get_data()
@@ -2126,7 +2123,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:hair:any|dark|light — тогаем выбранность
         - gen:hair:next          — фиксируем выбор и переходим к возрасту
         """
-        from fsm import GenerationFlow
+        
 
         await q.answer()
 
@@ -2280,8 +2277,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data.startswith("gen:age:"))
     async def on_gen_choose_age(q: CallbackQuery, state: FSMContext):
-        from fsm import GenerationFlow
-
         await q.answer()
 
         current = await state.get_state()
@@ -2343,8 +2338,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага стиля к выбору возраста.
         """
-        from fsm import GenerationFlow
-
         lang = await get_lang(q, db)
         data = await state.get_data()
         if data.get("settings_mode") == "per_item":
@@ -2414,8 +2407,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага аспектов к выбору стиля.
         """
-        from fsm import GenerationFlow
-
         lang = await get_lang(q, db)
         data = await state.get_data()
         if data.get("settings_mode") == "per_item":
@@ -2456,8 +2447,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:style:strict|luxury|casual|sport — тогаем
         - gen:style:next                      — фиксируем и переходим к аспектам
         """
-        from fsm import GenerationFlow
-
         await q.answer()
 
         current = await state.get_state()
@@ -2561,7 +2550,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             except Exception:
                 await q.message.answer(full_text, reply_markup=kb)
 
-            from fsm import GenerationFlow
             await state.set_state(GenerationFlow.choosing_aspect)
             await q.answer()
             return
@@ -2571,7 +2559,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data.startswith("gen:aspect:"))
     async def on_gen_choose_aspect(q: CallbackQuery, state: FSMContext):
-        from fsm import GenerationFlow
 
         await q.answer()
 
@@ -2953,8 +2940,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Из экрана подтверждения (summary) назад к выбору соотношения сторон.
         """
-        from fsm import GenerationFlow
-
         lang = await get_lang(q, db)
         data = await state.get_data()
         selected = set(data.get("aspects") or set())
@@ -2991,9 +2976,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - action=topup: просто напоминаем про пополнение
         Ошибка по одной комбинации НЕ ломает остальные.
         """
-        from fsm import GenerationFlow
-        from utils.db import GeneratedImage, ImageRole  # локальный импорт
-
         current = await state.get_state()
         if current != GenerationFlow.confirming.state:
             await q.answer()
@@ -3681,7 +3663,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # Re-trigger the confirmation flow by simulating the callback
         # The state should still have all the generation parameters
-        from aiogram.types import CallbackQuery as CQ
         # Create a fake callback to re-trigger on_gen_confirm
         await on_gen_confirm(q, state, bot)
 
@@ -3930,7 +3911,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- Photo review helper function ---
     async def _show_photo_for_review(message: Message, state: FSMContext, lang: str, db: Database):
         """Show current photo with approval buttons."""
-        from aiogram.types import BufferedInputFile
 
         data = await state.get_data()
         photos = data.get("review_photos", [])
@@ -4760,7 +4740,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # ==================================================================
     async def _show_angles_poses_menu(message: Message, state: FSMContext, lang: str, db: Database):
         """Show the angles/poses menu for the current base photo."""
-        from aiogram.types import BufferedInputFile
 
         data = await state.get_data()
         base_photos = data.get("base_photos", [])
@@ -5460,10 +5439,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.message(AdminFlow.waiting_translations_file, F.document)
     async def on_translations_file(m: Message, state: FSMContext, bot: Bot):
         """Handle uploaded translations CSV file."""
-        import csv
-        import os
-        import shutil
-        from datetime import datetime
 
         admin_ids = settings.telegram_admin_ids if settings else ()
         if m.from_user.id not in admin_ids:
