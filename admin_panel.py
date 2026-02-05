@@ -2604,7 +2604,7 @@ async def create_backup(
                     "source_image_urls": g.source_image_urls,
                     "error_message": g.error_message,
                     "created_at": g.created_at.isoformat() if g.created_at else None,
-                    "completed_at": g.completed_at.isoformat() if g.completed_at else None,
+                    "finished_at": g.finished_at.isoformat() if g.finished_at else None,
                 }
                 for g in generations
             ]
