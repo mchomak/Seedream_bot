@@ -7,6 +7,7 @@ import contextlib
 from aiogram import Bot, Dispatcher
 from loguru import logger
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 import sys
 import os
 
@@ -43,9 +44,11 @@ async def main() -> None:
     storage = await create_fsm_storage(settings.redis_url)
 
     # 4) Telegram Bot and Dispatcher
+    session = AiohttpSession(timeout=120)
     bot = Bot(
         token=settings.telegram_bot_token,
         default=DefaultBotProperties(parse_mode="HTML"),
+        session=session,
     )
     dp = Dispatcher(storage=storage)
     seedream = SeedreamService(

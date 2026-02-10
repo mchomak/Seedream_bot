@@ -289,6 +289,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 await q.answer(T(lang, "profile_not_found"), show_alert=True)
                 return
 
+        await state.clear()
+
         # Set state for upload type selection
         await state.set_state(GenerationFlow.selecting_upload_type)
 
@@ -1412,8 +1414,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await m.answer(T(lang, "no_credits"))
             return
 
-        # Skip intro, go directly to upload type selection
-        
+        # ВАЖНО: Очищаем старое состояние перед новой генерацией
+        await state.clear()
+
         await state.set_state(GenerationFlow.selecting_upload_type)
 
         kb = InlineKeyboardMarkup(
@@ -1435,9 +1438,11 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- gen:start: показать рекомендации и выбор типа фото ---
     @r.callback_query(F.data == "gen:start")
     async def on_gen_start(q: CallbackQuery, state: FSMContext):
-        
 
         lang = await get_lang(q, db)
+
+        # ВАЖНО: Очищаем старое состояние перед новой генерацией
+        await state.clear()
 
         # переводим в состояние выбора типа
         await state.set_state(GenerationFlow.selecting_upload_type)
@@ -1491,7 +1496,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- выбор типа загружаемой фотографии ---
     @r.callback_query(F.data.startswith("gen:type:"))
     async def on_gen_choose_type(q: CallbackQuery, state: FSMContext):
-        
 
         current = await state.get_state()
         if current != GenerationFlow.selecting_upload_type.state:
@@ -1539,7 +1543,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data == "gen:back_to_types")
     async def on_gen_back_to_types(q: CallbackQuery, state: FSMContext):
-        
 
         lang = await get_lang(q, db)
 
@@ -1624,8 +1627,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         Если ждём документ, но приходит photo — просим юзера отправить как документ.
         Заодно логируем тип сообщения.
         """
-        
-
         current_state = await state.get_state()
         # Логируем тип сообщения, чтобы ты видел в консоли
         logger.info(
@@ -1768,8 +1769,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага выбора пола обратно к выбору фона.
         """
-        
-
         lang = await get_lang(q, db)
         data = await state.get_data()
 
@@ -1816,8 +1815,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага выбора волос назад к выбору пола.
         """
-        
-
         lang = await get_lang(q, db)
         data = await state.get_data()
         settings_mode = data.get("settings_mode")
@@ -1878,8 +1875,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:bg:white|beige|pink|black — тогаем выбранность с галочками
         - gen:bg:next — сохраняем выбор и переходим к выбору пола
         """
-        
-
         # Ранний ответ для мгновенного отклика UI
         await q.answer()
 
@@ -2018,8 +2013,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - сохраняем gender
         - показываем шаг выбора цвета волос (мультивыбор)
         """
-        
-
         await q.answer()
 
         current_state = await state.get_state()
@@ -2080,7 +2073,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага возраста к выбору цвета волос (с сохранённым выбором).
         """
-        
 
         lang = await get_lang(q, db)
         data = await state.get_data()
@@ -2123,7 +2115,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:hair:any|dark|light — тогаем выбранность
         - gen:hair:next          — фиксируем выбор и переходим к возрасту
         """
-        
 
         await q.answer()
 
@@ -3911,7 +3902,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- Photo review helper function ---
     async def _show_photo_for_review(message: Message, state: FSMContext, lang: str, db: Database):
         """Show current photo with approval buttons."""
-
         data = await state.get_data()
         photos = data.get("review_photos", [])
         current_idx = data.get("current_photo_index", 0)
@@ -4740,7 +4730,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # ==================================================================
     async def _show_angles_poses_menu(message: Message, state: FSMContext, lang: str, db: Database):
         """Show the angles/poses menu for the current base photo."""
-
         data = await state.get_data()
         base_photos = data.get("base_photos", [])
         current_idx = data.get("current_base_index", 0)
