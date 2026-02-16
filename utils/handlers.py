@@ -243,6 +243,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- /start ---
     @r.message(Command("start"))
     async def cmd_start(m: Message, state: FSMContext):
+        logger.debug("[user:{}] /start", m.from_user.id)
         async with db.session() as s:
             await upsert_user_basic(
                 s,
@@ -277,6 +278,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "start:generate")
     async def on_start_generate(q: CallbackQuery, state: FSMContext):
         """Handle 'Start' button from welcome message - go directly to upload intro."""
+        logger.debug("[user:{}] start:generate", q.from_user.id)
         lang = await get_lang(q, db)
 
         # Check if user has credits
@@ -318,6 +320,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "start:examples")
     async def on_start_examples(q: CallbackQuery):
         """Handle 'Examples' button from welcome message."""
+        logger.debug("[user:{}] start:examples", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
         await q.message.answer(T(lang, "examples_soon"))
@@ -325,6 +328,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "start:account")
     async def on_start_account(q: CallbackQuery):
         """Handle 'My Account' button from welcome message."""
+        logger.debug("[user:{}] start:account", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
         await _show_account_menu(q.message, lang)
@@ -332,6 +336,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "start:back")
     async def on_start_back(q: CallbackQuery, state: FSMContext):
         """Handle 'Back' button - return to start menu."""
+        logger.debug("[user:{}] start:back", q.from_user.id)
         async with db.session() as s:
             free_gens = await get_free_generations_limit(s)
             price_per_gen = await get_single_credit_price_rub(s)
@@ -362,6 +367,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- /help ---
     @r.message(Command("help"))
     async def cmd_help(m: Message):
+        logger.debug("[user:{}] /help", m.from_user.id)
         lang = await get_lang(m, db)
 
         # Берём все help_items.* для текущего языка с fallback-цепочкой
@@ -523,32 +529,38 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.message(Command("profile"))
     async def cmd_profile(m: Message):
+        logger.debug("[user:{}] /profile", m.from_user.id)
         lang = await get_lang(m, db)
         await _show_account_menu(m, lang)
 
     # Handle keyboard button presses
     @r.message(F.text.in_(KB_MY_ACCOUNT))
     async def on_my_account_button(m: Message):
+        logger.debug("[user:{}] kb: my_account", m.from_user.id)
         lang = await get_lang(m, db)
         await _show_account_menu(m, lang)
 
     @r.message(F.text.in_(KB_GENERATION))
     async def on_generation_button(m: Message, state: FSMContext):
+        logger.debug("[user:{}] kb: generation", m.from_user.id)
         await cmd_generate(m, state)
 
     @r.message(F.text.in_(KB_EXAMPLES))
     async def on_examples_button(m: Message):
+        logger.debug("[user:{}] kb: examples", m.from_user.id)
         await cmd_examples(m)
 
     # Account menu callbacks
     @r.callback_query(F.data == "account:back")
     async def on_account_back(q: CallbackQuery):
+        logger.debug("[user:{}] account:back", q.from_user.id)
         await q.message.delete()
         await q.answer()
 
     @r.callback_query(F.data == "account:balance")
     async def on_account_balance(q: CallbackQuery):
         """Show balance view."""
+        logger.debug("[user:{}] account:balance", q.from_user.id)
         lang = await get_lang(q, db)
 
         async with db.session() as s:
@@ -584,6 +596,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "account:topup")
     async def on_account_topup(q: CallbackQuery, state: FSMContext):
         """Handle top-up request - show tariff selection."""
+        logger.debug("[user:{}] account:topup", q.from_user.id)
         lang = await get_lang(q, db)
         # Pass the actual user ID from callback query, not from message (which is bot's message)
         await _show_tariff_selection(q.message, lang, edit=True, tg_user_id=q.from_user.id)
@@ -592,6 +605,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("tariff:"))
     async def on_tariff_selected(q: CallbackQuery, state: FSMContext):
         """Handle tariff package selection."""
+        logger.debug("[user:{}] tariff:{}", q.from_user.id, q.data.split(":")[1])
         lang = await get_lang(q, db)
         tariff_id = q.data.split(":")[1]
         await _show_payment_method_for_tariff(q.message, lang, tariff_id)
@@ -600,6 +614,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "pay:yookassa_disabled")
     async def on_yookassa_disabled(q: CallbackQuery):
         """Handle click on disabled YooKassa button."""
+        logger.debug("[user:{}] pay:yookassa_disabled", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer(T(lang, "yookassa_not_configured"), show_alert=True)
 
@@ -607,6 +622,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "account:menu")
     async def on_account_menu(q: CallbackQuery):
         """Return to account menu."""
+        logger.debug("[user:{}] account:menu", q.from_user.id)
         lang = await get_lang(q, db)
         await _show_account_menu(q.message, lang, edit=True)
         await q.answer()
@@ -614,6 +630,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "account:language")
     async def on_account_language(q: CallbackQuery):
         """Show language selection from account menu."""
+        logger.debug("[user:{}] account:language", q.from_user.id)
         lang = await get_lang(q, db)
 
         # Build language keyboard with account-specific callback prefix
@@ -632,6 +649,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("account:set_lang:"))
     async def on_account_set_lang(q: CallbackQuery, bot: Bot):
         """Handle language selection from account menu - return to account menu after."""
+        logger.debug("[user:{}] account:set_lang | data={}", q.from_user.id, q.data)
         parts = q.data.split(":")
         if len(parts) < 3:
             await q.answer("Oops")
@@ -675,6 +693,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("account:history:"))
     async def on_account_history(q: CallbackQuery):
         """Show generation history with pagination."""
+        logger.debug("[user:{}] account:history | page={}", q.from_user.id, q.data.split(":")[-1])
         lang = await get_lang(q, db)
 
         # Parse page number
@@ -832,6 +851,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("hist:download:"))
     async def on_history_download(q: CallbackQuery):
         """Download images from a generation."""
+        logger.debug("[user:{}] hist:download | gen_id={}", q.from_user.id, q.data.split(":")[-1])
         lang = await get_lang(q, db)
         gen_id = int(q.data.split(":")[-1])
 
@@ -874,6 +894,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("hist:use_base:"))
     async def on_history_use_as_base(q: CallbackQuery, state: FSMContext):
         """Use a historical generation as base for angles/poses stage."""
+        logger.debug("[user:{}] hist:use_base | gen_id={}", q.from_user.id, q.data.split(":")[-1])
         lang = await get_lang(q, db)
         gen_id = int(q.data.split(":")[-1])
 
@@ -924,6 +945,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.message(Command("buy"))
     async def cmd_buy(m: Message, state: FSMContext):
         """Show tariff selection for top-up."""
+        logger.debug("[user:{}] /buy", m.from_user.id)
         lang = await get_lang(m, db)
         await _show_tariff_selection(m, lang, edit=False)
 
@@ -932,6 +954,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("pay:stars:"))
     async def on_pay_stars(q: CallbackQuery, state: FSMContext):
         """Handle Telegram Stars payment selection."""
+        logger.debug("[user:{}] pay:stars | data={}", q.from_user.id, q.data)
         lang = await get_lang(q, db)
         # Parse: pay:stars:tariff_id:credits:stars
         parts = q.data.split(":")
@@ -958,6 +981,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("pay:yookassa:"))
     async def on_pay_yookassa(q: CallbackQuery, state: FSMContext):
         """Handle YooKassa payment selection - create payment and show link."""
+        logger.debug("[user:{}] pay:yookassa | data={}", q.from_user.id, q.data)
         lang = await get_lang(q, db)
 
         if not yookassa.enabled:
@@ -1036,6 +1060,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("yookassa:check:"))
     async def on_yookassa_check_payment(q: CallbackQuery, state: FSMContext):
         """Check YooKassa payment status."""
+        logger.debug("[user:{}] yookassa:check | data={}", q.from_user.id, q.data)
         lang = await get_lang(q, db)
 
         # Parse: yookassa:check:payment_id:credits
@@ -1172,6 +1197,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- /language (и /lang, /swith_lang для совместимости) ---
     @r.message(Command("language", "lang", "swith_lang"))
     async def cmd_switch_lang(m: Message):
+        logger.debug("[user:{}] /language", m.from_user.id)
         lang = await get_lang(m, db)
         await m.answer(T(lang, "choose_lang_title"), reply_markup=_build_lang_kb())
 
@@ -1183,6 +1209,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:mode:all      -> единые настройки для всех вещей
         - gen:mode:per_item -> отдельные настройки для каждой вещи (пока заглушка)
         """
+        logger.debug("[user:{}] gen:mode | mode={}", query.from_user.id, query.data.split(":")[-1])
         lang = await get_lang(query, db)
         data = await state.get_data()
 
@@ -1293,6 +1320,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data.startswith("set_lang:"))
     async def on_set_lang(q: CallbackQuery, bot: Bot):
+        logger.debug("[user:{}] set_lang | data={}", q.from_user.id, q.data)
         parts = q.data.split(":", 1)
         if len(parts) != 2:
             await q.answer("Oops")
@@ -1373,12 +1401,14 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.message(Command("examples"))
     async def cmd_examples(m: Message):
+        logger.debug("[user:{}] /examples", m.from_user.id)
         lang = await get_lang(m, db)
         await m.answer(T(lang, "examples_soon"))
 
 
     @r.message(Command("cancel"))
     async def cmd_cancel(m: Message, state: FSMContext):
+        logger.debug("[user:{}] /cancel", m.from_user.id)
         await state.clear()
         lang = await get_lang(m, db)
         await m.answer(T(lang, "cancel_done"))
@@ -1393,6 +1423,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - проверяем, что у пользователя есть минимум 1 кредит
         - показываем краткое описание + кнопку «Начать»
         """
+        logger.debug("[user:{}] /generate", m.from_user.id)
         lang = await get_lang(m, db)
 
         async with db.session() as s:
@@ -1438,7 +1469,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- gen:start: показать рекомендации и выбор типа фото ---
     @r.callback_query(F.data == "gen:start")
     async def on_gen_start(q: CallbackQuery, state: FSMContext):
-
+        logger.debug("[user:{}] gen:start", q.from_user.id)
         lang = await get_lang(q, db)
 
         # ВАЖНО: Очищаем старое состояние перед новой генерацией
@@ -1496,7 +1527,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- выбор типа загружаемой фотографии ---
     @r.callback_query(F.data.startswith("gen:type:"))
     async def on_gen_choose_type(q: CallbackQuery, state: FSMContext):
-
+        logger.debug("[user:{}] gen:type | type={}", q.from_user.id, q.data.split(":")[-1])
         current = await state.get_state()
         if current != GenerationFlow.selecting_upload_type.state:
             await q.answer()
@@ -1543,7 +1574,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data == "gen:back_to_types")
     async def on_gen_back_to_types(q: CallbackQuery, state: FSMContext):
-
+        logger.debug("[user:{}] gen:back_to_types", q.from_user.id)
         lang = await get_lang(q, db)
 
         kb = InlineKeyboardMarkup(
@@ -1592,6 +1623,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат к главному меню /start.
         """
+        logger.debug("[user:{}] gen:back_to_menu", q.from_user.id)
         async with db.session() as s:
             free_gens = await get_free_generations_limit(s)
             price_per_gen = await get_single_credit_price_rub(s)
@@ -1627,6 +1659,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         Если ждём документ, но приходит photo — просим юзера отправить как документ.
         Заодно логируем тип сообщения.
         """
+        logger.debug("[user:{}] photo received (compressed)", m.from_user.id)
         current_state = await state.get_state()
         # Логируем тип сообщения, чтобы ты видел в консоли
         logger.info(
@@ -1654,6 +1687,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - после каждой загрузки показываем/обновляем сообщение
           'Вы загрузили N вещей. Что вам удобнее?' с двумя сценариями.
         """
+        logger.debug("[user:{}] document upload | file_name={}", message.from_user.id, message.document.file_name)
 
         lang = await get_lang(message, db)
 
@@ -1769,6 +1803,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага выбора пола обратно к выбору фона.
         """
+        logger.debug("[user:{}] gen:back_to_background", q.from_user.id)
         lang = await get_lang(q, db)
         data = await state.get_data()
 
@@ -1815,6 +1850,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага выбора волос назад к выбору пола.
         """
+        logger.debug("[user:{}] gen:back_to_gender", q.from_user.id)
         lang = await get_lang(q, db)
         data = await state.get_data()
         settings_mode = data.get("settings_mode")
@@ -1875,6 +1911,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:bg:white|beige|pink|black — тогаем выбранность с галочками
         - gen:bg:next — сохраняем выбор и переходим к выбору пола
         """
+        logger.debug("[user:{}] gen:bg | choice={}", q.from_user.id, q.data.split(":")[-1])
         # Ранний ответ для мгновенного отклика UI
         await q.answer()
 
@@ -2013,6 +2050,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - сохраняем gender
         - показываем шаг выбора цвета волос (мультивыбор)
         """
+        logger.debug("[user:{}] gen:gender | gender={}", q.from_user.id, q.data.split(":")[-1])
         await q.answer()
 
         current_state = await state.get_state()
@@ -2073,7 +2111,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага возраста к выбору цвета волос (с сохранённым выбором).
         """
-
+        logger.debug("[user:{}] gen:back_to_hair", q.from_user.id)
         lang = await get_lang(q, db)
         data = await state.get_data()
         if data.get("settings_mode") == "per_item":
@@ -2115,7 +2153,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:hair:any|dark|light — тогаем выбранность
         - gen:hair:next          — фиксируем выбор и переходим к возрасту
         """
-
+        logger.debug("[user:{}] gen:hair | choice={}", q.from_user.id, q.data.split(":")[-1])
         await q.answer()
 
         current = await state.get_state()
@@ -2268,6 +2306,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data.startswith("gen:age:"))
     async def on_gen_choose_age(q: CallbackQuery, state: FSMContext):
+        logger.debug("[user:{}] gen:age | age={}", q.from_user.id, q.data.split(":")[-1])
         await q.answer()
 
         current = await state.get_state()
@@ -2329,6 +2368,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага стиля к выбору возраста.
         """
+        logger.debug("[user:{}] gen:back_to_age", q.from_user.id)
         lang = await get_lang(q, db)
         data = await state.get_data()
         if data.get("settings_mode") == "per_item":
@@ -2398,6 +2438,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Возврат со шага аспектов к выбору стиля.
         """
+        logger.debug("[user:{}] gen:back_to_style", q.from_user.id)
         lang = await get_lang(q, db)
         data = await state.get_data()
         if data.get("settings_mode") == "per_item":
@@ -2438,6 +2479,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - gen:style:strict|luxury|casual|sport — тогаем
         - gen:style:next                      — фиксируем и переходим к аспектам
         """
+        logger.debug("[user:{}] gen:style | choice={}", q.from_user.id, q.data.split(":")[-1])
         await q.answer()
 
         current = await state.get_state()
@@ -2550,7 +2592,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     @r.callback_query(F.data.startswith("gen:aspect:"))
     async def on_gen_choose_aspect(q: CallbackQuery, state: FSMContext):
-
+        logger.debug("[user:{}] gen:aspect | choice={}", q.from_user.id, q.data.split(":")[-1])
         await q.answer()
 
         current = await state.get_state()
@@ -2931,6 +2973,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         """
         Из экрана подтверждения (summary) назад к выбору соотношения сторон.
         """
+        logger.debug("[user:{}] gen:aspect_back", q.from_user.id)
         lang = await get_lang(q, db)
         data = await state.get_data()
         selected = set(data.get("aspects") or set())
@@ -2967,6 +3010,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         - action=topup: просто напоминаем про пополнение
         Ошибка по одной комбинации НЕ ломает остальные.
         """
+        logger.debug("[user:{}] gen:confirm | action={}", q.from_user.id, q.data.split(":")[-1])
         current = await state.get_state()
         if current != GenerationFlow.confirming.state:
             await q.answer()
@@ -3641,6 +3685,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "gen:retry_upload")
     async def on_gen_retry_upload(q: CallbackQuery, state: FSMContext, bot: Bot):
         """Handle retry upload request - retry the generation from the beginning."""
+        logger.debug("[user:{}] gen:retry_upload", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -3662,6 +3707,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "gen:regenerate")
     async def on_gen_regenerate(q: CallbackQuery, state: FSMContext, bot: Bot):
         """Handle regenerate request - retry generation with same parameters."""
+        logger.debug("[user:{}] gen:regenerate", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -3811,6 +3857,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "gen:retry_download")
     async def on_gen_retry_download(q: CallbackQuery, state: FSMContext):
         """Handle retry download request."""
+        logger.debug("[user:{}] gen:retry_download", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -3905,6 +3952,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         data = await state.get_data()
         photos = data.get("review_photos", [])
         current_idx = data.get("current_photo_index", 0)
+        uid = message.from_user.id if message.from_user else "?"
+        logger.debug("[user:{}] _show_photo_for_review | idx={}/{}", uid, current_idx, len(photos))
         approved = data.get("approved_photos", [])
 
         if current_idx >= len(photos):
@@ -3986,6 +4035,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("review:approve:"))
     async def on_photo_approve(q: CallbackQuery, state: FSMContext):
         """Handle photo approval."""
+        logger.debug("[user:{}] review:approve | idx={}", q.from_user.id, q.data.split(":")[-1])
         lang = await get_lang(q, db)
         current = await state.get_state()
 
@@ -4022,6 +4072,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("review:reject:"))
     async def on_photo_reject(q: CallbackQuery, state: FSMContext):
         """Handle photo rejection."""
+        logger.debug("[user:{}] review:reject | idx={}", q.from_user.id, q.data.split(":")[-1])
         lang = await get_lang(q, db)
         current = await state.get_state()
 
@@ -4093,6 +4144,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("review:redo:"))
     async def on_photo_redo(q: CallbackQuery, state: FSMContext):
         """Handle photo redo request."""
+        logger.debug("[user:{}] review:redo | idx={}", q.from_user.id, q.data.split(":")[-1])
         lang = await get_lang(q, db)
         current = await state.get_state()
 
@@ -4387,6 +4439,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "review:back_to_review")
     async def on_back_to_review(q: CallbackQuery, state: FSMContext):
         """Return to photo review."""
+        logger.debug("[user:{}] review:back_to_review", q.from_user.id)
         lang = await get_lang(q, db)
         try:
             await q.message.delete()
@@ -4399,6 +4452,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("review:redo_single:"))
     async def on_single_photo_redo(q: CallbackQuery, state: FSMContext):
         """Handle redo for single photo batch."""
+        logger.debug("[user:{}] review:redo_single | action={}", q.from_user.id, q.data.split(":")[-1])
         lang = await get_lang(q, db)
         action = q.data.split(":")[-1]
 
@@ -4720,6 +4774,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "gen:topup")
     async def on_topup_from_review(q: CallbackQuery):
         """Handle topup request from review."""
+        logger.debug("[user:{}] gen:topup", q.from_user.id)
         lang = await get_lang(q, db)
         await q.message.answer(T(lang, "no_credits"))
         await q.answer()
@@ -4733,6 +4788,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         data = await state.get_data()
         base_photos = data.get("base_photos", [])
         current_idx = data.get("current_base_index", 0)
+        uid = message.from_user.id if message.from_user else "?"
+        logger.debug("[user:{}] _show_angles_poses_menu | idx={}/{}", uid, current_idx, len(base_photos))
 
         if current_idx >= len(base_photos):
             # All base photos processed
@@ -4772,6 +4829,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("angles:pose:") | F.data.startswith("angles:angle:"))
     async def on_angles_pose_angle(q: CallbackQuery, state: FSMContext):
         """Handle pose/angle change requests."""
+        logger.debug("[user:{}] angles | data={}", q.from_user.id, q.data)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -4931,6 +4989,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "angles:rear")
     async def on_angles_rear_view(q: CallbackQuery, state: FSMContext):
         """Handle rear view request."""
+        logger.debug("[user:{}] angles:rear", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -4948,6 +5007,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "angles:rear_no_photo")
     async def on_angles_rear_no_photo(q: CallbackQuery, state: FSMContext):
         """Handle rear view without reference photo."""
+        logger.debug("[user:{}] angles:rear_no_photo", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -5062,6 +5122,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data.startswith("angles:full_body") | F.data.startswith("angles:upper_body") | F.data.startswith("angles:lower_body"))
     async def on_angles_framing(q: CallbackQuery, state: FSMContext):
         """Handle framing options (full/upper/lower body)."""
+        logger.debug("[user:{}] angles:framing | data={}", q.from_user.id, q.data)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -5175,6 +5236,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "angles:finish")
     async def on_angles_finish(q: CallbackQuery, state: FSMContext):
         """Handle finish button - ask for confirmation."""
+        logger.debug("[user:{}] angles:finish", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -5192,6 +5254,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "angles:finish_confirm")
     async def on_angles_finish_confirm(q: CallbackQuery, state: FSMContext):
         """Handle confirmed finish - move to next base photo or complete."""
+        logger.debug("[user:{}] angles:finish_confirm", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -5235,6 +5298,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "angles:finish_cancel")
     async def on_angles_finish_cancel(q: CallbackQuery, state: FSMContext):
         """Handle cancelled finish - return to angles menu."""
+        logger.debug("[user:{}] angles:finish_cancel", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -5245,6 +5309,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.callback_query(F.data == "angles:continue")
     async def on_angles_continue(q: CallbackQuery, state: FSMContext):
         """Handle continue button - return to angles menu."""
+        logger.debug("[user:{}] angles:continue", q.from_user.id)
         lang = await get_lang(q, db)
         await q.answer()
 
@@ -5255,6 +5320,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.message(GenerationFlow.waiting_rear_photo, F.document)
     async def on_rear_photo_upload(m: Message, state: FSMContext, bot: Bot):
         """Handle rear photo upload for rear view generation."""
+        logger.debug("[user:{}] rear photo upload | file_name={}", m.from_user.id, m.document.file_name)
         lang = await get_lang(m, db)
 
         # Download uploaded rear photo
@@ -5386,16 +5452,19 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     # --- payments flow ---
     @r.pre_checkout_query()
     async def on_pre_checkout(q: PreCheckoutQuery):
+        logger.debug("[user:{}] pre_checkout | payload={}", q.from_user.id, q.invoice_payload)
         await pay.pre_checkout_handler(q)
 
     @r.message(F.successful_payment)
     async def on_success_payment(m: Message, state: FSMContext):
+        logger.debug("[user:{}] successful_payment | amount={}", m.from_user.id, m.successful_payment.total_amount)
         await pay.on_successful_payment(m, state)
 
     # --- Admin: upload translations ---
     @r.message(Command("upload_translations"))
     async def cmd_upload_translations(m: Message, state: FSMContext):
         """Admin command to upload new translations CSV file."""
+        logger.debug("[user:{}] /upload_translations", m.from_user.id)
         admin_ids = settings.telegram_admin_ids if settings else ()
         user_id = m.from_user.id
 
@@ -5428,7 +5497,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.message(AdminFlow.waiting_translations_file, F.document)
     async def on_translations_file(m: Message, state: FSMContext, bot: Bot):
         """Handle uploaded translations CSV file."""
-
+        logger.debug("[user:{}] translations file upload | file={}", m.from_user.id, m.document.file_name)
         admin_ids = settings.telegram_admin_ids if settings else ()
         if m.from_user.id not in admin_ids:
             await state.clear()
@@ -5531,6 +5600,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
     @r.message(AdminFlow.waiting_translations_file)
     async def on_translations_file_invalid(m: Message, state: FSMContext):
         """Handle non-document message in translation upload state."""
+        logger.debug("[user:{}] translations: invalid message (expected document)", m.from_user.id)
         if m.text and m.text.startswith("/cancel"):
             await state.clear()
             await m.answer("❌ Upload cancelled.")
