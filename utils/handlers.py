@@ -1700,7 +1700,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         cloth_file_ids = list(data.get("cloth_file_ids") or [])
         cloth_file_ids.append(doc.file_id)
         num_items = len(cloth_file_ids)
-        await state.update_data(cloth_file_ids=cloth_file_ids, num_items=num_items)
+        # New upload invalidates any stale redo source URLs
+        await state.update_data(cloth_file_ids=cloth_file_ids, num_items=num_items, redo_source_urls=None)
 
         # --- если загружена только 1 вещь: сразу идём в настройки (как gen:mode:all) ---
         if num_items == 1:
@@ -3042,9 +3043,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         upload_type = data.get("upload_type") or "flat"
         settings_mode = data.get("settings_mode")
 
-        # Если есть готовые URL из redo - используем их напрямую
+        # Fresh uploads take priority over stale redo URLs
         cloth_urls: list[str] = []
-        if redo_source_urls:
+        if redo_source_urls and not cloth_file_ids:
             cloth_urls = list(redo_source_urls)
         else:
             # Загружаем и отправляем файлы в Seedream
