@@ -118,6 +118,8 @@ class Settings:
     redis_url: Optional[str] = None
     seedream_api: Optional[str] = None
     seedream_proxy: Optional[str] = None  # SOCKS5/HTTP proxy for Seedream API (e.g. socks5://127.0.0.1:1080)
+    telegram_proxy: Optional[str] = None  # SOCKS5/HTTP proxy for Telegram (e.g. socks5://127.0.0.1:1080)
+    telegram_proxy_mode: str = "none"  # "none" | "media" | "full"
     telegram_admin_ids: tuple[int, ...] = ()  # Telegram user IDs allowed to use admin commands
 
 
@@ -146,6 +148,8 @@ def load_env(env_file: str = ".env") -> Settings:
     redis_url = os.getenv("REDIS_URL")
     seedream_api = os.getenv("SEEDREAM_API")
     seedream_proxy = os.getenv("SEEDREAM_PROXY")  # e.g. socks5://127.0.0.1:1080
+    telegram_proxy = os.getenv("TELEGRAM_PROXY") or None
+    telegram_proxy_mode = os.getenv("TELEGRAM_PROXY_MODE", "none").strip().lower()
 
     # Parse TELEGRAM_ADMIN_IDS (comma-separated list of Telegram user IDs)
     admin_ids_str = os.getenv("TELEGRAM_ADMIN_IDS", "").strip()
@@ -167,6 +171,12 @@ def load_env(env_file: str = ".env") -> Settings:
     if log_level not in valid_levels:
         raise ValueError(f"LOG_LEVEL must be one of {sorted(valid_levels)} (got: {log_level}).")
 
+    valid_proxy_modes = {"none", "media", "full"}
+    if telegram_proxy_mode not in valid_proxy_modes:
+        raise ValueError(
+            f"TELEGRAM_PROXY_MODE must be one of {sorted(valid_proxy_modes)} (got: {telegram_proxy_mode!r})."
+        )
+
     if database_url.startswith("sqlite"):
         try:
             path_part = database_url.split("///", 1)[1]
@@ -184,6 +194,8 @@ def load_env(env_file: str = ".env") -> Settings:
         redis_url=redis_url,
         seedream_api=seedream_api,
         seedream_proxy=seedream_proxy,
+        telegram_proxy=telegram_proxy,
+        telegram_proxy_mode=telegram_proxy_mode,
         telegram_admin_ids=telegram_admin_ids,
     )
 

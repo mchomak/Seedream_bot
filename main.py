@@ -7,7 +7,6 @@ import contextlib
 from aiogram import Bot, Dispatcher
 from loguru import logger
 from aiogram.client.default import DefaultBotProperties
-from aiogram.client.session.aiohttp import AiohttpSession
 import sys
 import os
 
@@ -23,6 +22,7 @@ from utils.setup_log import (
     report_exception,
 )
 from utils.seedream_service import SeedreamService
+from utils.proxy_session import build_telegram_session
 # app.py (или main.py)
 from utils.localization import Localizer, LocalizerConfig
 
@@ -44,7 +44,11 @@ async def main() -> None:
     storage = await create_fsm_storage(settings.redis_url)
 
     # 4) Telegram Bot and Dispatcher
-    session = AiohttpSession(timeout=300)
+    session = build_telegram_session(
+        proxy=settings.telegram_proxy,
+        mode=settings.telegram_proxy_mode,
+        timeout=300,
+    )
     bot = Bot(
         token=settings.telegram_bot_token,
         default=DefaultBotProperties(parse_mode="HTML"),
@@ -75,6 +79,11 @@ async def main() -> None:
     )
 
     logger.info("Starting bot…", extra={"runtime": get_runtime_env(settings)})
+    logger.info(
+        "Telegram proxy mode: {}{}",
+        settings.telegram_proxy_mode,
+        f" → {settings.telegram_proxy}" if settings.telegram_proxy else " (no proxy)",
+    )
 
     # 7) Install bot commands (menu)
     await install_bot_commands(bot, lang="ru")  # or "en"
