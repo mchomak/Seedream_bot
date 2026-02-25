@@ -888,7 +888,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                     caption=f"Generation #{gen_id} - Image {i + 1}/{len(images)}"
                 )
             except Exception as e:
-                logger.exception(f"Failed to download image {img.id}", exc_info=e)
+                logger.exception(f"Failed to download image {img.id}")
 
 
     @r.callback_query(F.data.startswith("hist:use_base:"))
@@ -1700,7 +1700,8 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         cloth_file_ids = list(data.get("cloth_file_ids") or [])
         cloth_file_ids.append(doc.file_id)
         num_items = len(cloth_file_ids)
-        await state.update_data(cloth_file_ids=cloth_file_ids, num_items=num_items)
+        # New upload invalidates any stale redo source URLs
+        await state.update_data(cloth_file_ids=cloth_file_ids, num_items=num_items, redo_source_urls=None)
 
         # --- если загружена только 1 вещь: сразу идём в настройки (как gen:mode:all) ---
         if num_items == 1:
@@ -3042,9 +3043,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         upload_type = data.get("upload_type") or "flat"
         settings_mode = data.get("settings_mode")
 
-        # Если есть готовые URL из redo - используем их напрямую
+        # Fresh uploads take priority over stale redo URLs
         cloth_urls: list[str] = []
-        if redo_source_urls:
+        if redo_source_urls and not cloth_file_ids:
             cloth_urls = list(redo_source_urls)
         else:
             # Загружаем и отправляем файлы в Seedream
@@ -3061,7 +3062,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         await q.message.edit_text(err_text)
                     except Exception:
                         await q.message.answer(err_text)
-                    logger.exception("Telegram file download failed", exc_info=e)
+                    logger.exception("Telegram file download failed")
                     return
 
                 try:
@@ -3117,6 +3118,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             async with db.session() as s:
                 price_per_generation = await get_scenario_price(s, "initial_generation")
                 total_cost = total_combinations * price_per_generation
+                free_limit = await get_free_generations_limit(s)
 
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
@@ -3130,8 +3132,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         await q.message.answer(T(lang, "no_credits"))
                     return
 
-                current_balance = int(user_db.credits_balance or 0)
-                if current_balance < total_cost:
+                free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0))
+                available = free_remaining + int(user_db.credits_balance or 0)
+                if available < total_cost:
                     await state.clear()
                     try:
                         await q.message.edit_text(T(lang, "no_credits"))
@@ -3278,6 +3281,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             async with db.session() as s:
                 price_per_generation = await get_scenario_price(s, "initial_generation")
                 total_cost = total_combinations * price_per_generation
+                free_limit = await get_free_generations_limit(s)
 
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
@@ -3291,8 +3295,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         await q.message.answer(T(lang, "no_credits"))
                     return
 
-                current_balance = int(user_db.credits_balance or 0)
-                if current_balance < total_cost:
+                free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0))
+                available = free_remaining + int(user_db.credits_balance or 0)
+                if available < total_cost:
                     await state.clear()
                     try:
                         await q.message.edit_text(T(lang, "no_credits"))
@@ -4154,13 +4159,17 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         photo_idx = int(q.data.split(":")[-1])
 
-        # Check if user has enough credits (1 credit per generation)
+        # Check if user has enough credits or free generations (1 credit per generation)
         async with db.session() as s:
             user_db = (
                 await s.execute(select(User).where(User.user_id == q.from_user.id))
             ).scalar_one_or_none()
 
-            if not user_db or (user_db.credits_balance or 0) < 1:
+            free_limit = await get_free_generations_limit(s)
+            free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0)) if user_db else 0
+            available = free_remaining + int(user_db.credits_balance or 0) if user_db else 0
+
+            if not user_db or available < 1:
                 # Insufficient balance
                 kb = InlineKeyboardMarkup(
                     inline_keyboard=[
@@ -4277,7 +4286,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 if user_db and gen_db:
                     user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
 
-            logger.exception("Seedream create_task failed (redo)", exc_info=e)
+            logger.exception("Seedream create_task failed (redo)")
             await q.message.answer(T(lang, "generation_failed"))
 
             # Move to next photo (fault tolerance)
@@ -4361,7 +4370,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                     "generation_id": new_generation_id,
                     "photo_idx": photo_idx
                 },
-                exc_info=last_error
             )
             await q.message.answer(T(lang, "generation_failed"))
 
@@ -4389,7 +4397,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                     "result_urls": result_urls,
                     "error": repr(e)
                 },
-                exc_info=e
             )
             await q.message.answer(T(lang, "generation_failed"))
 
@@ -4528,13 +4535,17 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 await q.answer("Cannot retrieve generation parameters", show_alert=True)
                 return
 
-            # Check balance first
+            # Check balance first (credits + remaining free generations)
             async with db.session() as s:
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
                 ).scalar_one_or_none()
 
-                if not user_db or (user_db.credits_balance or 0) < 1:
+                free_limit = await get_free_generations_limit(s)
+                free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0)) if user_db else 0
+                available = free_remaining + int(user_db.credits_balance or 0) if user_db else 0
+
+                if not user_db or available < 1:
                     kb = InlineKeyboardMarkup(
                         inline_keyboard=[
                             [
@@ -4630,7 +4641,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                     if user_db and gen_db:
                         user_db.credits_balance = (user_db.credits_balance or 0) + gen_db.credits_spent
 
-                logger.exception("Seedream create_task failed (redo single)", exc_info=e)
+                logger.exception("Seedream create_task failed (redo single)")
                 await q.message.answer(T(lang, "generation_failed"))
                 return
 
@@ -4707,7 +4718,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         "task_id": task_id,
                         "generation_id": new_generation_id
                     },
-                    exc_info=last_error
                 )
                 await q.message.answer(T(lang, "generation_failed"))
                 return
@@ -4729,7 +4739,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         "result_urls": result_urls,
                         "error": repr(e)
                     },
-                    exc_info=e
                 )
                 await q.message.answer(T(lang, "generation_failed"))
                 return
@@ -4859,13 +4868,17 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         aspect = base_photo.get("aspect", "3_4")
         image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
 
-        # Check credits
+        # Check credits + remaining free generations
         async with db.session() as s:
             user_db = (
                 await s.execute(select(User).where(User.user_id == q.from_user.id))
             ).scalar_one_or_none()
 
-            if not user_db or (user_db.credits_balance or 0) < count:
+            free_limit = await get_free_generations_limit(s)
+            free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0)) if user_db else 0
+            available = free_remaining + int(user_db.credits_balance or 0) if user_db else 0
+
+            if not user_db or available < count:
                 await q.message.answer(T(lang, "insufficient_balance"))
                 return
 
@@ -4967,7 +4980,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 )
 
             except Exception as e:
-                logger.exception(f"Failed to generate {action_type} variant", exc_info=e)
+                logger.exception(f"Failed to generate {action_type} variant")
                 async with db.session() as s:
                     gen_db = (
                         await s.execute(select(Generation).where(Generation.id == new_generation_id))
@@ -5115,7 +5128,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await state.set_state(GenerationFlow.angles_poses_menu)
 
         except Exception as e:
-            logger.exception("Failed to generate rear view", exc_info=e)
+            logger.exception("Failed to generate rear view")
             await q.message.answer(T(lang, "generation_failed"))
 
 
@@ -5229,7 +5242,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             )
 
         except Exception as e:
-            logger.exception(f"Failed to generate {framing_type}", exc_info=e)
+            logger.exception(f"Failed to generate {framing_type}")
             await q.message.answer(T(lang, "generation_failed"))
 
 
@@ -5330,7 +5343,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             file_buf.seek(0)
             rear_bytes = file_buf.read()
         except Exception as e:
-            logger.exception("Failed to download rear photo", exc_info=e)
+            logger.exception("Failed to download rear photo")
             await m.answer(T(lang, "generation_failed"))
             return
 
@@ -5342,7 +5355,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 f"rear_{m.from_user.id}_{m.document.file_id}.jpg"
             )
         except Exception as e:
-            logger.exception("Failed to upload rear photo to Seedream", exc_info=e)
+            logger.exception("Failed to upload rear photo to Seedream")
             await m.answer(T(lang, "generation_failed"))
             return
 
@@ -5445,7 +5458,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await state.set_state(GenerationFlow.angles_poses_menu)
 
         except Exception as e:
-            logger.exception("Failed to generate rear view with reference", exc_info=e)
+            logger.exception("Failed to generate rear view with reference")
             await m.answer(T(lang, "generation_failed"))
 
 
