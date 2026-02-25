@@ -3118,6 +3118,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             async with db.session() as s:
                 price_per_generation = await get_scenario_price(s, "initial_generation")
                 total_cost = total_combinations * price_per_generation
+                free_limit = await get_free_generations_limit(s)
 
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
@@ -3131,8 +3132,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         await q.message.answer(T(lang, "no_credits"))
                     return
 
-                current_balance = int(user_db.credits_balance or 0)
-                if current_balance < total_cost:
+                free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0))
+                available = free_remaining + int(user_db.credits_balance or 0)
+                if available < total_cost:
                     await state.clear()
                     try:
                         await q.message.edit_text(T(lang, "no_credits"))
@@ -3279,6 +3281,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             async with db.session() as s:
                 price_per_generation = await get_scenario_price(s, "initial_generation")
                 total_cost = total_combinations * price_per_generation
+                free_limit = await get_free_generations_limit(s)
 
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
@@ -3292,8 +3295,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                         await q.message.answer(T(lang, "no_credits"))
                     return
 
-                current_balance = int(user_db.credits_balance or 0)
-                if current_balance < total_cost:
+                free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0))
+                available = free_remaining + int(user_db.credits_balance or 0)
+                if available < total_cost:
                     await state.clear()
                     try:
                         await q.message.edit_text(T(lang, "no_credits"))
@@ -4155,13 +4159,17 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         photo_idx = int(q.data.split(":")[-1])
 
-        # Check if user has enough credits (1 credit per generation)
+        # Check if user has enough credits or free generations (1 credit per generation)
         async with db.session() as s:
             user_db = (
                 await s.execute(select(User).where(User.user_id == q.from_user.id))
             ).scalar_one_or_none()
 
-            if not user_db or (user_db.credits_balance or 0) < 1:
+            free_limit = await get_free_generations_limit(s)
+            free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0)) if user_db else 0
+            available = free_remaining + int(user_db.credits_balance or 0) if user_db else 0
+
+            if not user_db or available < 1:
                 # Insufficient balance
                 kb = InlineKeyboardMarkup(
                     inline_keyboard=[
@@ -4527,13 +4535,17 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                 await q.answer("Cannot retrieve generation parameters", show_alert=True)
                 return
 
-            # Check balance first
+            # Check balance first (credits + remaining free generations)
             async with db.session() as s:
                 user_db = (
                     await s.execute(select(User).where(User.user_id == q.from_user.id))
                 ).scalar_one_or_none()
 
-                if not user_db or (user_db.credits_balance or 0) < 1:
+                free_limit = await get_free_generations_limit(s)
+                free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0)) if user_db else 0
+                available = free_remaining + int(user_db.credits_balance or 0) if user_db else 0
+
+                if not user_db or available < 1:
                     kb = InlineKeyboardMarkup(
                         inline_keyboard=[
                             [
@@ -4856,13 +4868,17 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         aspect = base_photo.get("aspect", "3_4")
         image_size, image_resolution = ASPECT_PARAMS.get(aspect, ("768x1024", "768x1024"))
 
-        # Check credits
+        # Check credits + remaining free generations
         async with db.session() as s:
             user_db = (
                 await s.execute(select(User).where(User.user_id == q.from_user.id))
             ).scalar_one_or_none()
 
-            if not user_db or (user_db.credits_balance or 0) < count:
+            free_limit = await get_free_generations_limit(s)
+            free_remaining = max(0, free_limit - int(user_db.free_generations_used or 0)) if user_db else 0
+            available = free_remaining + int(user_db.credits_balance or 0) if user_db else 0
+
+            if not user_db or available < count:
                 await q.message.answer(T(lang, "insufficient_balance"))
                 return
 
