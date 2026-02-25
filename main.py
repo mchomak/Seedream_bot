@@ -44,7 +44,7 @@ async def main() -> None:
     storage = await create_fsm_storage(settings.redis_url)
 
     # 4) Telegram Bot and Dispatcher
-    session = AiohttpSession(timeout=120)
+    session = AiohttpSession(timeout=300)
     bot = Bot(
         token=settings.telegram_bot_token,
         default=DefaultBotProperties(parse_mode="HTML"),
