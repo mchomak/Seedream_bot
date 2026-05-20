@@ -242,7 +242,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
     # --- /start ---
     @r.message(Command("start"))
-    async def cmd_start(m: Message, state: FSMContext):
+    async def cmd_start(m: Message, state: FSMContext, bot: Bot):
         logger.debug("[user:{}] /start", m.from_user.id)
         async with db.session() as s:
             await upsert_user_basic(
@@ -259,6 +259,22 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             price_per_gen = await get_single_credit_price_rub(s)
         lang = await get_lang(m, db)
         await state.clear()  # Clear any existing state
+
+        # Ensure per-chat commands are always set so menu buttons never disappear
+        _items = get_i18n().group("help_items", lang=lang)
+        await bot.set_my_commands(
+            [
+                BotCommand(command="start", description=_items.get("start", "Start")),
+                BotCommand(command="help", description=_items.get("help", "Help")),
+                BotCommand(command="profile", description=_items.get("profile", "Profile")),
+                BotCommand(command="generate", description=_items.get("generate", "Generate")),
+                BotCommand(command="examples", description=_items.get("examples", "Examples")),
+                BotCommand(command="buy", description=_items.get("buy", "Buy")),
+                BotCommand(command="language", description=_items.get("language", "Language")),
+                BotCommand(command="cancel", description=_items.get("cancel", "Cancel")),
+            ],
+            scope=BotCommandScopeChat(chat_id=m.chat.id),
+        )
 
         # Inline keyboard with main actions
         kb = InlineKeyboardMarkup(
@@ -917,13 +933,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             await q.answer("No images found", show_alert=True)
             return
 
-        # Download image bytes for state
-        img_bytes = await asyncio.to_thread(seedream.download_file_bytes, images[0].storage_url)
-
         # Initialize angles/poses stage with this as base photo
         base_photo = {
             "url": images[0].storage_url,
-            "bytes": img_bytes,
             "generation_id": gen_id,
             "background": (gen.params or {}).get("background", "white"),
             "hair": (gen.params or {}).get("hair", "any"),
@@ -3476,7 +3488,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                             image_records.append(
                                 {
                                     "url": url,
-                                    "bytes": img_bytes,
                                     "generation_id": generation_id,
                                     "background": meta["background"],
                                     "hair": meta["hair"],
@@ -3494,7 +3505,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
                             image_records.append(
                                 {
                                     "url": url,
-                                    "bytes": None,  # Mark as not downloaded
                                     "generation_id": generation_id,
                                     "background": meta["background"],
                                     "hair": meta["hair"],
@@ -3618,7 +3628,7 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # Check if any images failed to download
         failed_downloads = [rec for rec in image_records if rec.get("download_failed")]
-        successful_downloads = [rec for rec in image_records if not rec.get("download_failed") and rec.get("bytes")]
+        successful_downloads = [rec for rec in image_records if not rec.get("download_failed")]
 
         if failed_downloads and not successful_downloads:
             # All downloads failed - show retry/regenerate options
@@ -3991,11 +4001,16 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         caption = f"{T(lang, 'photo_review_title', current=current_idx + 1, total=total)}\n\n{T(lang, 'photo_review_question')}"
 
         # Send as uncompressed document for original quality
+        tg_file_id = photo.get("telegram_file_id")
+        if tg_file_id:
+            doc_input = tg_file_id
+        else:
+            _dl_url = await asyncio.to_thread(seedream.get_download_url, photo["url"])
+            _img_bytes = await asyncio.to_thread(seedream.download_file_bytes, _dl_url)
+            doc_input = BufferedInputFile(_img_bytes, filename=f"generation_{current_idx + 1}.png")
+
         doc_msg = await message.answer_document(
-            document=BufferedInputFile(
-                photo["bytes"],
-                filename=f"generation_{current_idx + 1}.png"
-            ),
+            document=doc_input,
             caption=caption,
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -4023,6 +4038,9 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
 
         # Store document file_id for later use
         if doc_msg.document:
+            if not tg_file_id:
+                photos[current_idx]["telegram_file_id"] = doc_msg.document.file_id
+                await state.update_data(review_photos=photos)
             async with db.session() as s:
                 img_db = (
                     await s.execute(
@@ -4430,7 +4448,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
         # Replace photo in review list
         photos[photo_idx] = {
             "url": result_urls[0],
-            "bytes": img_bytes,
             "generation_id": new_generation_id,
             "background": photo.get("background"),
             "hair": photo.get("hair"),
@@ -4766,7 +4783,6 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             # Replace photo in review list
             photos[0] = {
                 "url": result_urls[0],
-                "bytes": img_bytes,
                 "generation_id": new_generation_id,
                 "background": photo.get("background"),
                 "hair": photo.get("hair"),
@@ -4825,14 +4841,18 @@ def build_router(db: Database, seedream: SeedreamService, i18n: Localizer, setti
             ]
         )
 
-        await message.answer_document(
-            document=BufferedInputFile(
-                base_photo["bytes"],
-                filename=f"base_photo_{current_idx + 1}.png"
-            ),
-            caption=caption,
-            reply_markup=kb
-        )
+        tg_file_id = base_photo.get("telegram_file_id")
+        if tg_file_id:
+            doc_input = tg_file_id
+        else:
+            _dl_url = await asyncio.to_thread(seedream.get_download_url, base_photo["url"])
+            _img_bytes = await asyncio.to_thread(seedream.download_file_bytes, _dl_url)
+            doc_input = BufferedInputFile(_img_bytes, filename=f"base_photo_{current_idx + 1}.png")
+
+        sent = await message.answer_document(document=doc_input, caption=caption, reply_markup=kb)
+        if not tg_file_id and sent.document:
+            base_photos[current_idx]["telegram_file_id"] = sent.document.file_id
+            await state.update_data(base_photos=base_photos)
 
 
     @r.callback_query(F.data.startswith("angles:pose:") | F.data.startswith("angles:angle:"))
